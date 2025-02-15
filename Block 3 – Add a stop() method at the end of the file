@@ -1,3 +1,0 @@
-    def stop(self) -> None:
-        self._running = False
-        keyboard.unhook_all()

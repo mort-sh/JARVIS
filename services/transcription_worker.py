@@ -109,3 +109,7 @@ class TranscriptionWorker(QObject):
         )
         while self._running:
             time.sleep(0.1)
+
+    def stop(self) -> None:
+        self._running = False
+        keyboard.unhook_all()
