@@ -49,8 +49,7 @@ class CommandLibrary:
         ),
         "code_completion": (
             "You are an expert software engineer. Write concise, efficient, and industry-standard code "
-            "with a focus on performance, readability, and maintainability. Ensure best practices, "
-            "modularity, and robust handling of edge cases in every solution."
+            "with a focus on performance, readability, and maintainability. Ensure best practices, modularity, and robust handling of edge cases in every solution. Respond with a JSON object with a single key \"code\" containing only the code."
         ),
     }
 
