@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
     QComboBox,
 )
 
+from ai.openai_wrapper import GLOBAL_DEFAULT_MODEL
 from commands.command_library import CommandLibrary
 
 
@@ -114,14 +115,14 @@ class PopupDialog(QDialog):
                     elif hasattr(m, "id"):
                         model_ids.append(m.id)
             if not model_ids:
-                model_ids = ["GPT-40"]
+                model_ids = [GLOBAL_DEFAULT_MODEL]
         except Exception as e:
-            model_ids = ["GPT-40"]
+            model_ids = [GLOBAL_DEFAULT_MODEL]
         # Ensure default model is GPT-40
-        if "GPT-40" not in model_ids:
-            model_ids.insert(0, "GPT-40")
+        if GLOBAL_DEFAULT_MODEL not in model_ids:
+            model_ids.insert(0, GLOBAL_DEFAULT_MODEL)
         self.model_combo.addItems(model_ids)
-        self.model_combo.setCurrentIndex(self.model_combo.findText("GPT-40"))
+        self.model_combo.setCurrentIndex(self.model_combo.findText(GLOBAL_DEFAULT_MODEL))
         self.current_model = self.model_combo.currentText()
         self.model_combo.currentTextChanged.connect(lambda text: setattr(self, "current_model", text))
     
@@ -275,5 +276,3 @@ class PopupDialog(QDialog):
     def _scroll_to_bottom(self) -> None:
         self.text_edit.moveCursor(QTextCursor.End)
         self.text_edit.ensureCursorVisible()
-
-
