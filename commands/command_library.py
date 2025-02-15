@@ -138,6 +138,7 @@ class CommandLibrary:
                 model="gpt-4o",
                 temperature=0.1,
                 max_tokens=1500,
+                conversation_history=[{"role": sender.lower(), "content": content} for sender, content in dialog.conversation_history] if dialog and dialog.conversation_history else None
             )
             if code_response:
                 pyperclip.copy(code_response)
@@ -187,7 +188,7 @@ class CommandLibrary:
         messages = [{"role": "system", "content": self.PROMPTS["general_question"]}]
         if hasattr(dialog, "conversation_history") and dialog.conversation_history:
             for sender, content in dialog.conversation_history:
-                messages.append({"role": sender, "content": content})
+                messages.append({"role": sender.lower(), "content": content})
         messages.append({"role": "user", "content": prompt})
 
         worker_thread = QThread()

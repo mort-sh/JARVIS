@@ -254,6 +254,7 @@ class OpenAIWrapper:
         model: str = GLOBAL_DEFAULT_MODEL,
         temperature: float = 0.2,
         max_tokens: int = 1500,
+        conversation_history: Optional[List[Dict[str, str]]] = None,
     ) -> Optional[str]:
         """
         Generates code strictly adhering to a JSON schema. Returns only the code snippet.
@@ -279,10 +280,10 @@ class OpenAIWrapper:
                 "and any necessary comments, without additional explanations."
             )
 
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
+        messages = [{"role": "system", "content": system_prompt}]
+        if conversation_history:
+            messages.extend(conversation_history)
+        messages.append({"role": "user", "content": user_prompt})
 
         return self.structured_output(
             messages=messages,
