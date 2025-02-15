@@ -2,10 +2,8 @@
 Handles keyboard hooking, audio recording, transcription, and simulated typing.
 
 New functionality (swapped keybinds):
-- When just Right Shift is held (without Control), the program records audio,
-  transcribes it, and simulates typing the transcription (commands are not processed).
-- When Control + Right Shift is held, the transcription is emitted via a signal for
-  normal command processing.
+- When just Right Shift is held (without Control), the transcription is emitted via a signal for normal command processing.
+- When Control + Right Shift is held, the program records audio, transcribes it, and simulates typing the transcription (commands are not processed).
 """
 
 import time
@@ -77,13 +75,13 @@ class TranscriptionWorker(QObject):
                 transcription = self.transcribe_and_send(filename)
                 if transcription:
                     if self.ctrl_active:
-                        # Control was held: emit transcription for normal command processing.
-                        print("Emitting transcription for command processing (Control held)...")
-                        self.transcriptionReady.emit(transcription)
-                    else:
-                        # No Control held: simulate typing the transcription (bypassing command processing).
-                        print("Simulating typing of transcription (Right Shift only)...")
+                        # Control was held: simulate typing of transcription (bypassing command processing).
+                        print("Simulating typing of transcription (Control + Right Shift held)...")
                         keyboard.write(transcription, delay=0.01)
+                    else:
+                        # No Control held: emit transcription for normal command processing.
+                        print("Emitting transcription for command processing (Right Shift only)...")
+                        self.transcriptionReady.emit(transcription)
             else:
                 logging.info("Recording too short or no frames. No transcription performed.")
 
