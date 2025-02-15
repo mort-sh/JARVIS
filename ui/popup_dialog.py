@@ -21,6 +21,9 @@ class PopupDialog(QDialog):
         super().__init__(parent)
         self.conversation_history = []  # List of tuples (sender, message)
         self.oldPos = None
+        self.current_request_cost = 0.0
+        self.last_request_cost = 0.0
+        self.total_cost = 0.0
         self.initUI()
 
     def initUI(self) -> None:
@@ -81,7 +84,11 @@ class PopupDialog(QDialog):
         button_layout.addStretch()
         button_layout.addWidget(close_button)
         layout.addLayout(button_layout)
-
+        self.cost_label = QLabel("Cost: Request: $0.00, Last: $0.00, Total: $0.00")
+        self.cost_label.setAlignment(Qt.AlignRight)
+        self.cost_label.setStyleSheet("color: #00dd00; font-size: 14px;")
+        layout.addWidget(self.cost_label)
+    
         self.text_edit = QTextEdit(self)
         self.text_edit.setAcceptRichText(True)
         self.text_edit.setAutoFormatting(QTextEdit.AutoAll)
@@ -232,3 +239,7 @@ class PopupDialog(QDialog):
     def _scroll_to_bottom(self) -> None:
         self.text_edit.moveCursor(QTextCursor.End)
         self.text_edit.ensureCursorVisible()
+
+    def update_cost_info(self, current_cost: float, last_cost: float, total_cost: float) -> None:
+        """Update the cost display with the current request cost, the last request cost, and the total session cost."""
+        self.cost_label.setText(f"Cost: Request: ${current_cost:.2f}, Last: ${last_cost:.2f}, Total: ${total_cost:.2f}")
