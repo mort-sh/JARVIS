@@ -37,6 +37,25 @@ class PopupDialog(QDialog):
         layout.setContentsMargins(27, 27, 27, 15)
         layout.setSpacing(10)
 
+        clear_button = QPushButton("Clear")
+        clear_button.setFixedSize(60, 30)
+        clear_button.clicked.connect(self.handle_clear)
+        clear_button.setStyleSheet(
+            """
+            QPushButton {
+                background-color: transparent;
+                color: #00dd00;
+                font-size: 20px;
+                border: none;
+                border-radius: 15px;
+                margin: 5px;
+            }
+            QPushButton:hover {
+                background-color: #00dd00;
+                color: #000000;
+            }
+            """
+        )
         close_button = QPushButton("×")
         close_button.setFixedSize(30, 30)
         close_button.clicked.connect(self.handle_close)
@@ -144,6 +163,10 @@ class PopupDialog(QDialog):
 
     def handle_close(self) -> None:
         self.hide()
+
+    def handle_clear(self) -> None:
+        self.conversation_history = []
+        self.text_edit.clear()
 
     def closeEvent(self, event) -> None:
         event.ignore()
