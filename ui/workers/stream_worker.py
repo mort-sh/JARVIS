@@ -11,13 +11,14 @@ class StreamWorker(QObject):
     # Signal to deliver partial text updates.
     partialResult = pyqtSignal(str)
 
-    def __init__(self, ai, prompt: str, messages: List[dict], temperature: float, max_tokens: int, parent=None) -> None:
+    def __init__(self, ai, prompt: str, messages: List[dict], temperature: float, max_tokens: int, model: str, parent=None) -> None:
         super().__init__(parent)
         self.ai = ai
         self.prompt = prompt
         self.messages = messages
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.model = model
 
     def run(self) -> None:
         partial_tokens: List[str] = []

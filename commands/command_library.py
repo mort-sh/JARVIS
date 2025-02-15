@@ -135,7 +135,7 @@ class CommandLibrary:
             code_response = self.ai.generate_code(
                 user_prompt=f"{text}\n{current_text}",
                 system_prompt=self.PROMPTS["code_completion"],
-                model="gpt-4o",
+                model=dialog.current_model if dialog and hasattr(dialog, "current_model") and dialog.current_model else "gpt-4o",
                 temperature=0.1,
                 max_tokens=1500,
                 conversation_history=[{"role": sender.lower(), "content": content} for sender, content in dialog.conversation_history] if dialog and dialog.conversation_history else None

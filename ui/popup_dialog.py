@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QPushButton,
     QLabel,
+    QComboBox,
 )
 
 from commands.command_library import CommandLibrary
@@ -82,6 +83,26 @@ class PopupDialog(QDialog):
         button_layout.addStretch()
         button_layout.addWidget(close_button)
         layout.addLayout(button_layout)
+        self.model_combo = QComboBox(self)
+        # Populate the model_combo with available models
+        try:
+            from ai.openai_wrapper import OpenAIWrapper
+            ai_wrapper = OpenAIWrapper()
+            models = ai_wrapper.list_models()
+            model_ids = []
+            if models:
+                for m in models:
+                    if isinstance(m, dict) and "id" in m:
+                        model_ids.append(m["id"])
+                    elif hasattr(m, "id"):
+                        model_ids.append(m.id)
+            if not model_ids:
+                model_ids = ["gpt-4o"]
+        except Exception as e:
+            model_ids = ["gpt-4o"]
+        self.model_combo.addItems(model_ids)
+        self.current_model = self.model_combo.currentText()
+        self.model_combo.currentTextChanged.connect(lambda text: setattr(self, "current_model", text))
     
         self.text_edit = QTextEdit(self)
         self.text_edit.setAcceptRichText(True)
