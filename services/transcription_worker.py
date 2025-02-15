@@ -16,6 +16,7 @@ import numpy as np
 import sounddevice as sd
 import soundfile as sf
 import whisper
+import logging
 from PyQt5.QtCore import QObject, pyqtSignal
 
 
