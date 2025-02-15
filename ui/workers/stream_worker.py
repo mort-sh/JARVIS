@@ -3,6 +3,7 @@ Worker for streaming AI responses.
 """
 
 from PyQt5.QtCore import QObject, pyqtSignal
+import logging
 from typing import List
 
 
