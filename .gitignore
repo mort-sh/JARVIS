@@ -6,7 +6,6 @@ __pycache__
 .python-version
 my_app.egg-info
 *.lock
-dist\
 .DS_Store
 .idea
 .vscode
