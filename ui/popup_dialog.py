@@ -84,6 +84,7 @@ class PopupDialog(QDialog):
         button_layout.addWidget(close_button)
         layout.addLayout(button_layout)
         self.model_combo = QComboBox(self)
+        self.model_combo.setMinimumWidth(300)
         self.model_combo.setStyleSheet(
             """
             QComboBox {
