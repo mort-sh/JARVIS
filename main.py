@@ -20,7 +20,6 @@ def main() -> None:
     # Create the popup dialog; this also instantiates the CommandLibrary.
     dialog = PopupDialog()
     dialog.set_font_size(15)
-    dialog.left()
     dialog.setWindowOpacity(0.95)
 
     # Print the list of registered commands.

@@ -32,7 +32,7 @@ class PopupDialog(QDialog):
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
 
-        self.resize(800, 600)
+        self.resize(1000, 700)
         self.center()
 
         layout = QVBoxLayout(self)
