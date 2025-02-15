@@ -64,6 +64,19 @@ class OpenAIWrapper:
         else:
             self.client = OpenAI(api_key=self.api_key)
             logger.debug("Using custom OpenAI client.")
+            
+    def get_valid_model(self) -> str:
+        """
+        Returns a valid model ID from the list of available models.
+        """
+        models = self.list_models()
+        if models:
+            for m in models:
+                if isinstance(m, dict) and "id" in m:
+                    return m["id"]
+                elif hasattr(m, "id"):
+                    return m.id
+        raise ValueError("No valid OpenAI model found.")
 
     def generate_chat_completion(
         self,
@@ -85,6 +98,8 @@ class OpenAIWrapper:
             Optional[str]: The assistant's response text if successful, None otherwise.
         """
         try:
+            if model == GLOBAL_DEFAULT_MODEL:
+                model = self.get_valid_model()
             if not messages:
                 raise ValueError("'messages' must contain at least one message.")
 
@@ -135,6 +150,8 @@ class OpenAIWrapper:
             Dict[str, Any]: A dictionary with 'assistant_reply' and 'response' keys.
         """
         try:
+            if model == GLOBAL_DEFAULT_MODEL:
+                model = self.get_valid_model()
             # Validate or build messages
             if messages is None:
                 if not prompt:
@@ -206,6 +223,8 @@ class OpenAIWrapper:
         }
 
         try:
+            if model == GLOBAL_DEFAULT_MODEL:
+                model = self.get_valid_model()
             if not messages:
                 raise ValueError("'messages' must contain at least one message.")
 
