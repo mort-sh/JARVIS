@@ -133,11 +133,12 @@ class CommandLibrary:
                 current_text = f"```\n{current_text}\n```"
             else:
                 current_text = ""
-            code_response = self.ai.code(
-                prompt_usr=f"{text}\n{current_text}",
-                prompt_sys=self.PROMPTS["code_completion"],
+            code_response = self.ai.generate_code(
+                user_prompt=f"{text}\n{current_text}",
+                system_prompt=self.PROMPTS["code_completion"],
                 model="gpt-4o",
                 temperature=0.1,
+                max_tokens=1500,
             )
             if code_response:
                 pyperclip.copy(code_response)
