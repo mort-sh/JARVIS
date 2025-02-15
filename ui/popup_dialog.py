@@ -84,6 +84,22 @@ class PopupDialog(QDialog):
         button_layout.addWidget(close_button)
         layout.addLayout(button_layout)
         self.model_combo = QComboBox(self)
+        self.model_combo.setStyleSheet(
+            """
+            QComboBox {
+                background-color: rgba(19, 19, 20, 0.9);
+                color: #00dd00;
+                border: 1px solid #00dd00;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: rgba(19, 19, 20, 0.9);
+                color: #00dd00;
+                selection-background-color: rgba(0, 221, 0, 0.3);
+            }
+            """
+        )
         # Populate the model_combo with available models
         try:
             from ai.openai_wrapper import OpenAIWrapper
@@ -97,10 +113,14 @@ class PopupDialog(QDialog):
                     elif hasattr(m, "id"):
                         model_ids.append(m.id)
             if not model_ids:
-                model_ids = ["gpt-4o"]
+                model_ids = ["GPT-40"]
         except Exception as e:
-            model_ids = ["gpt-4o"]
+            model_ids = ["GPT-40"]
+        # Ensure default model is GPT-40
+        if "GPT-40" not in model_ids:
+            model_ids.insert(0, "GPT-40")
         self.model_combo.addItems(model_ids)
+        self.model_combo.setCurrentIndex(self.model_combo.findText("GPT-40"))
         self.current_model = self.model_combo.currentText()
         self.model_combo.currentTextChanged.connect(lambda text: setattr(self, "current_model", text))
     
