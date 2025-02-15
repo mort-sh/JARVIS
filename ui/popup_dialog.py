@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QPushButton,
+    QLabel,
 )
 
 from commands.command_library import CommandLibrary
