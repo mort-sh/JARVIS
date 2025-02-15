@@ -179,20 +179,15 @@ class CommandLibrary:
         prompt = self._extract_prompt(text)
         if not prompt:
             return ""
-
+        
         # Optionally include clipboard content.
         if "clipboard" in prompt.lower():
             prompt += f"\n```\n{pyperclip.paste()}\n```"
-
-        messages = []
-        if dialog is None or not hasattr(dialog, "conversation_history") or not dialog.conversation_history:
-            # New conversation: include system prompt.
-            messages.append({"role": "system", "content": self.PROMPTS["general_question"]})
-        else:
-            # Continuing conversation: include previous conversation history.
+        
+        messages = [{"role": "system", "content": self.PROMPTS["general_question"]}]
+        if hasattr(dialog, "conversation_history") and dialog.conversation_history:
             for sender, content in dialog.conversation_history:
-                role = "assistant" if sender.lower() == "assistant" else "user"
-                messages.append({"role": role, "content": content})
+                messages.append({"role": sender, "content": content})
         messages.append({"role": "user", "content": prompt})
 
         worker_thread = QThread()
