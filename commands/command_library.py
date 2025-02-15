@@ -198,6 +198,7 @@ class CommandLibrary:
             messages=messages,
             temperature=0.7,
             max_tokens=512,
+            model=dialog.current_model if dialog and hasattr(dialog, "current_model") and dialog.current_model else "gpt-4o",
         )
         worker.moveToThread(worker_thread)
 

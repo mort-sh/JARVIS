@@ -30,7 +30,7 @@ class StreamWorker(QObject):
 
         result = self.ai.send_prompt(
             prompt=self.prompt,
-            model="gpt-4o",
+            model=self.model,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
             messages=self.messages,
