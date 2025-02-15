@@ -214,6 +214,7 @@ class PopupDialog(QDialog):
             self.raise_()
             self.repaint()
             self.setVisible(True)
+            self.calculate_and_update_cost(text, response)
 
     def append_message(self, message: str, sender: str = "Assistant") -> None:
         """Add a message to the conversation and refresh the display."""
@@ -244,3 +245,15 @@ class PopupDialog(QDialog):
     def update_cost_info(self, current_cost: float, last_cost: float, total_cost: float) -> None:
         """Update the cost display with the current request cost, the last request cost, and the total session cost."""
         self.cost_label.setText(f"Cost: Request: ${current_cost:.2f}, Last: ${last_cost:.2f}, Total: ${total_cost:.2f}")
+
+    def calculate_and_update_cost(self, request_text: str, response_text: str) -> None:
+        """Calculate the cost of a request and update the cost information in the UI."""
+        request_tokens = len(request_text.split())
+        response_tokens = len(response_text.split())
+        cost_request = request_tokens * (2.50 / 1000000)  # $2.50 per 1M tokens for input
+        cost_response = response_tokens * (10.00 / 1000000) # $10.00 per 1M tokens for output
+        this_cost = cost_request + cost_response
+        self.current_request_cost = this_cost
+        self.last_request_cost = this_cost
+        self.total_cost += this_cost
+        self.update_cost_info(self.current_request_cost, self.last_request_cost, self.total_cost)
