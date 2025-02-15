@@ -62,6 +62,8 @@ def main() -> None:
     except KeyboardInterrupt:
         print("Keyboard interrupt detected. Exiting application...")
     finally:
+        worker.stop()
+        dialog.cmd_library.shutdown_threads()
         sys.exit()
 
 

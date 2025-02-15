@@ -35,6 +35,7 @@ class TranscriptionWorker(QObject):
         print("Loading Whisper model (tiny.en). Please wait...")
         self.model = whisper.load_model("tiny.en")
         print("Whisper model loaded.")
+        self._running = True
 
     def audio_callback(self, indata: np.ndarray, frames: int, time_info: dict, status) -> None:
         if status:
@@ -106,4 +107,5 @@ class TranscriptionWorker(QObject):
             " - Hold only Right Shift to simulate typing (commands bypassed).\n"
             " - Hold Control + Right Shift to emit transcription for command processing."
         )
-        keyboard.wait()
+        while self._running:
+            time.sleep(0.1)

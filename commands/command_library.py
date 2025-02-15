@@ -221,3 +221,10 @@ class CommandLibrary:
             if phrase in text_lower:
                 return text_lower.replace(phrase, "").strip()
         return text
+
+    def shutdown_threads(self) -> None:
+        for thread, worker in list(self.active_threads):
+            if thread.isRunning():
+                thread.quit()
+                thread.wait()
+        self.active_threads.clear()
