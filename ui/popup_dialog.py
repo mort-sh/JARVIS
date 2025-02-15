@@ -77,6 +77,7 @@ class PopupDialog(QDialog):
         )
 
         button_layout = QHBoxLayout()
+        button_layout.addWidget(clear_button)
         button_layout.addStretch()
         button_layout.addWidget(close_button)
         layout.addLayout(button_layout)
