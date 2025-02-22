@@ -341,6 +341,76 @@ class DataState(BaseState):
         )
 
 
+class RecordingState(BaseState):
+    """
+    State for displaying audio recording status with live updates.
+    Includes recording status, duration, and volume meter.
+    """
+
+    def __init__(self):
+        super().__init__("recording", "Audio Recording")
+        self.is_recording = False
+        self.duration = 0.0
+        self.volume_level = 0.0
+        self.transcribing = False
+        
+    def update(self, is_recording: bool, duration: float = 0.0, volume_level: float = 0.0, transcribing: bool = False):
+        """Update the recording state with new values."""
+        self.is_recording = is_recording
+        self.duration = duration
+        self.volume_level = min(max(volume_level, 0.0), 1.0)  # Clamp between 0 and 1
+        self.transcribing = transcribing
+        self.first_timestamp = datetime.datetime.now()  # Update timestamp
+
+    def render(self) -> RenderableType:
+        # Create status section
+        status_icon = "🔴" if self.is_recording else "⚪"
+        status_text = "Recording" if self.is_recording else "Ready"
+        if self.transcribing:
+            status_text = "Transcribing..."
+            status_icon = "💭"
+            
+        status = Text.assemble(
+            (f"{status_icon} ", "bold"),
+            (status_text, "bold red" if self.is_recording else "bold grey")
+        )
+        
+        # Create duration counter
+        duration_text = Text.assemble(
+            ("Duration: ", "dim"),
+            (f"{self.duration:.1f}s", "bold cyan")
+        )
+        
+        # Create volume meter using progress bar
+        progress = Progress(
+            SpinnerColumn(style="cyan"),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(bar_width=40, style="cyan"),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            expand=True,
+        )
+        
+        # Add the volume task
+        task_id = progress.add_task("Volume", total=100.0)
+        progress.update(task_id, completed=self.volume_level * 100)
+        
+        # Combine all elements
+        content = Group(
+            status,
+            Text(),  # Empty line
+            duration_text,
+            Text(),  # Empty line
+            progress,
+        )
+        
+        return Panel(
+            content,
+            title="[bold]Recording Status[/]",
+            border_style="red" if self.is_recording else "blue",
+            box=box.HEAVY if self.is_recording else box.ROUNDED,
+            padding=(1, 2),
+        )
+
 # --------------------------------------------------------------------------
 # ADVANCED CONSOLE CLASS WITH WRAPPERS
 # --------------------------------------------------------------------------
