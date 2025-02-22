@@ -14,7 +14,10 @@ from PyQt5.QtWidgets import (
     QLabel,
     QComboBox,
 )
-from rich import print  # Added for beautified printing
+from rich.console import Console
+from rich.panel import Panel
+from rich import box
+console = Console()
 
 from ai.openai_wrapper import GLOBAL_DEFAULT_MODEL
 from commands.command_library import CommandLibrary
@@ -226,7 +229,7 @@ class PopupDialog(QDialog):
 
     def set_font_size(self, size: int) -> None:
         if size < 1:
-            print("[red]Font size must be a positive integer.[/red]")
+            console.print(Panel("[red]Font size must be a positive integer.[/red]", box=box.ROUNDED))
             return
         current_font = self.text_edit.font()
         current_font.setPointSize(size)
