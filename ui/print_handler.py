@@ -495,14 +495,14 @@ class AdvancedConsole:
     ) -> None:
         """Render syntax-highlighted code."""
         syntax = Syntax(code, lexer_name, theme=theme, line_numbers=line_numbers, word_wrap=word_wrap)
-        self.console.print(syntax)
+        self.print(syntax)
 
     # ------------------------------
     # Pretty Printing
     # ------------------------------
     def pretty_print(self, obj: Any, expand_all: bool = False) -> None:
         """Use Rich's Pretty to format Python objects in a more readable way."""
-        self.console.print(Pretty(obj, expand_all=expand_all))
+        self.print(Pretty(obj, expand_all=expand_all))
 
     # ------------------------------
     # Inspect
@@ -547,7 +547,7 @@ class AdvancedConsole:
         Construct a table from a list of dicts and print it.
         """
         if not data:
-            self.console.print("[warning]No data to display[/warning]")
+            self.print("[warning]No data to display[/warning]")
             return
 
         table = Table(title=title, box=box.SIMPLE_HEAD, expand=True)
@@ -559,7 +559,7 @@ class AdvancedConsole:
             row_values = [str(row.get(col, "")) for col in first_item.keys()]
             table.add_row(*row_values)
 
-        self.console.print(table)
+        self.print(table)
 
     # ------------------------------
     # Progress Bars
@@ -614,7 +614,7 @@ class AdvancedConsole:
         """
         tree = Tree(f"[bold]{title}[/bold]", guide_style="dim")
         self._build_tree(data, tree)
-        self.console.print(tree)
+        self.print(tree)
 
     def _build_tree(self, data: Any, parent) -> None:
         """Recursively build tree nodes from nested dict/list structures."""
@@ -637,7 +637,7 @@ class AdvancedConsole:
         Arrange multiple items in balanced columns.
         """
         renderables = [Text(item) for item in items]
-        self.console.print(Columns(renderables, width=width))
+        self.print(Columns(renderables, width=width))
 
     # ------------------------------
     # Markdown Rendering
@@ -647,7 +647,7 @@ class AdvancedConsole:
         Directly render markdown-formatted text to the console.
         """
         md = Markdown(md_text, code_theme=code_theme)
-        self.console.print(md)
+        self.print(md)
 
     # ------------------------------
     # Panels
@@ -664,7 +664,7 @@ class AdvancedConsole:
             box=box.ROUNDED,
             expand=False,
         )
-        self.console.print(panel)
+        self.print(panel)
 
     # ------------------------------
     # Live Updates
@@ -677,7 +677,7 @@ class AdvancedConsole:
         if self.live and self.live.is_started:
             self.live.update(renderable)
         else:
-            self.console.print(renderable)
+            self.print(renderable)
 
     # ------------------------------
     # Layout Management
@@ -696,11 +696,11 @@ class AdvancedConsole:
         try:
             json_str = json.dumps(data, indent=2)
             if highlight:
-                self.console.print(Syntax(json_str, "json", theme="monokai", word_wrap=True))
+                self.print(Syntax(json_str, "json", theme="monokai", word_wrap=True))
             else:
-                self.console.print(json_str)
+                self.print(json_str)
         except (TypeError, ValueError):
-            self.console.print("[error]Invalid JSON data[/error]")
+            self.print("[error]Invalid JSON data[/error]")
 
     # ------------------------------
     # Rules (Horizontal Dividers)
@@ -711,7 +711,7 @@ class AdvancedConsole:
         """
         if style_name not in self.theme_preset.styles:
             style_name = "info"
-        self.console.print(Rule(title=title, style=style_name))
+        self.print(Rule(title=title, style=style_name))
 
     # ------------------------------
     # Emoji Support
@@ -720,7 +720,7 @@ class AdvancedConsole:
         """
         Print an emoji by its colon-delimited name (e.g., :smiley:).
         """
-        self.console.print(Text.from_markup(emoji_name))
+        self.print(Text.from_markup(emoji_name))
 
     # ------------------------------
     # Exporting Capabilities
@@ -753,7 +753,7 @@ class AdvancedConsole:
         """
         import time
         with self.console.screen():
-            self.console.print(renderable)
+            self.print(renderable)
             time.sleep(delay)
 
     # ------------------------------
@@ -766,7 +766,7 @@ class AdvancedConsole:
         """
         terminal_width = max_width or self.console.width
         wrapped = Text(text_str).wrap(terminal_width, expand=False)
-        self.console.print(wrapped)
+        self.print(wrapped)
 
     # ------------------------------
     # Capturing Output
@@ -850,7 +850,7 @@ class AdvancedConsole:
         else:
             # Print them normally (one-time)
             for st in sorted_states:
-                self.console.print(st.render())
+                self.print(st.render())
 
 
 # ------------------------------------------------------------------------------
