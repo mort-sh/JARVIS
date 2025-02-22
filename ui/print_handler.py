@@ -1,343 +1,346 @@
-# print_handler.py
-#
-# A production-ready Rich-based printing library that supports text, 
-# actions (function/method calls), and *any* arbitrary data (lists, dicts, JSON, etc.). 
-#
+"""
+Rich-based terminal printing library with advanced formatting capabilities.
+
+This module provides a comprehensive set of tools for terminal-based visualization
+with support for themes, layouts, progress tracking, and various content types.
+"""
+
 import datetime
 import json
-from typing import Any, Dict, Optional, Union
+import logging
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Dict, List, Optional, Type, Union
 
 import rich
 import rich.pretty
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from rich import box
-from rich.console import Console, Group, RenderableType
+from rich.console import Console, ConsoleOptions, Group, RenderableType
 from rich.live import Live
+from rich.logging import RichHandler
 from rich.markdown import Markdown
+from rich.padding import Padding
 from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.spinner import Spinner
+from rich.style import Style
 from rich.syntax import Syntax
 from rich.table import Table
+from rich.text import Text
+from rich.theme import Theme
 
+# Configure logging with Rich handler
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+    handlers=[RichHandler(rich_tracebacks=True)]
+)
+logger = logging.getLogger("rich_printer")
 
-# A global spinner for consistent animation across states
-RUNNING_SPINNER = Spinner("dots")
+class DisplayMode(Enum):
+    """Available display modes for content rendering."""
+    FULL = "full"  # Full detail with all formatting
+    COMPACT = "compact"  # Minimal formatting
+    RAW = "raw"  # No formatting, just content
 
+@dataclass
+class ThemePreset:
+    """Predefined color and style combinations."""
+    name: str
+    styles: Dict[str, Style]
+    
+    @classmethod
+    def create_default(cls) -> 'ThemePreset':
+        """Create the default theme preset."""
+        return cls(
+            name="default",
+            styles={
+                "content": Style(color="blue"),
+                "action": Style(color="green"),
+                "data": Style(color="magenta"),
+                "error": Style(color="red"),
+                "success": Style(color="green"),
+                "warning": Style(color="yellow"),
+                "info": Style(color="cyan"),
+            }
+        )
 
-class DisplayState(BaseModel):
-    """
-    Base class for a piece of data/content/action to be displayed.
+class LayoutManager:
+    """Manages terminal layout and formatting constraints."""
+    
+    def __init__(self, console: Console):
+        self.console = console
+        self._update_dimensions()
+        
+    def _update_dimensions(self) -> None:
+        """Update stored terminal dimensions."""
+        self.width = min(100, self.console.width)
+        self.height = self.console.height
+        
+    def get_content_width(self, padding: int = 2) -> int:
+        """Calculate available content width accounting for padding."""
+        return max(20, self.width - (padding * 2))
 
-    Attributes:
-        identifier: Unique ID to track this display state (e.g., a message or event ID).
-        source_name: The name/label of the 'source' (e.g., user, system, agent).
-        first_timestamp: When this state was created or first recorded.
-    """
-    identifier: str
-    source_name: str
-    first_timestamp: datetime.datetime
-
-    def format_timestamp(self) -> str:
-        """Convert stored timestamp to a readable string."""
-        local_timestamp = self.first_timestamp.astimezone()
-        return local_timestamp.strftime("%I:%M:%S %p").lstrip("0").rjust(11)
-
-    def render_panel(self) -> Panel:
-        """
-        Subclasses should override this to return a Panel or
-        any Renderable representing the state's content.
-        """
-        raise NotImplementedError("Subclasses must implement render_panel().")
-
-
-class ContentState(DisplayState):
-    """
-    A display state for text-based content (including markdown).
-
-    Attributes:
-        content: The text or markdown content to display.
-    """
-    content: str = ""
-
-    @staticmethod
-    def _convert_content_to_str(content: Any) -> str:
-        """
-        Helper to convert various possible content formats into a single string.
-        Extend or customize based on your project's data structures.
-        """
-        if isinstance(content, str):
-            return content
-
-        if isinstance(content, dict):
-            return content.get("content", content.get("text", ""))
-
-        if isinstance(content, list):
-            # Concatenate string pieces or dict-based text fields
-            parts = []
-            for item in content:
-                if isinstance(item, str):
-                    parts.append(item)
-                elif isinstance(item, dict):
-                    part = item.get("content", item.get("text", ""))
-                    if part:
-                        parts.append(part)
-            return "\n".join(parts)
-
-        # Fallback: just string-cast
-        return str(content)
-
-    def update_content(self, new_content: Any) -> None:
-        """Update the stored content."""
-        self.content = self._convert_content_to_str(new_content)
-
-    def render_panel(self) -> Panel:
-        """Render the text or Markdown in a styled Panel."""
+class BaseRenderer(ABC):
+    """Abstract base class for content renderers."""
+    
+    def __init__(self, theme: ThemePreset, layout: LayoutManager):
+        self.theme = theme
+        self.layout = layout
+        
+    @abstractmethod
+    def render(self, content: Any) -> RenderableType:
+        """Render content into a Rich renderable."""
+        pass
+    
+    def create_panel(
+        self,
+        content: RenderableType,
+        title: str,
+        border_style: Union[str, Style],
+        subtitle: Optional[str] = None,
+    ) -> Panel:
+        """Create a styled panel with the given content."""
         return Panel(
-            Markdown(self.content),
-            title=f"[bold]Source: {self.source_name}[/]",
-            subtitle=f"[italic]{self.format_timestamp()}[/]",
+            content,
+            title=title,
+            subtitle=subtitle,
             title_align="left",
             subtitle_align="right",
-            border_style="blue",
+            border_style=border_style,
             box=box.ROUNDED,
-            width=100,
+            width=self.layout.width,
             padding=(1, 2),
         )
 
+class MarkdownRenderer(BaseRenderer):
+    """Renders markdown content with syntax highlighting."""
+    
+    def render(self, content: str) -> RenderableType:
+        return Markdown(
+            content,
+            code_theme="monokai",
+            inline_code_theme="monokai",
+        )
+
+class JsonRenderer(BaseRenderer):
+    """Renders JSON data with syntax highlighting."""
+    
+    def render(self, content: Any) -> RenderableType:
+        try:
+            if isinstance(content, str):
+                # Try to parse if it's a string
+                content = json.loads(content)
+            json_str = json.dumps(content, indent=2)
+            return Syntax(
+                json_str,
+                "json",
+                theme="monokai",
+                line_numbers=False,
+                word_wrap=True,
+            )
+        except (json.JSONDecodeError, TypeError):
+            return rich.pretty.Pretty(content, expand_all=True)
+
+class TableRenderer(BaseRenderer):
+    """Renders tabular data with customizable styling."""
+    
+    def render(self, data: List[Dict[str, Any]]) -> RenderableType:
+        if not data:
+            return Text("No data")
+            
+        table = Table(
+            show_header=True,
+            header_style="bold",
+            box=box.ROUNDED,
+            expand=True,
+        )
+        
+        # Add columns based on first row
+        columns = list(data[0].keys())
+        for col in columns:
+            table.add_column(col)
+            
+        # Add rows
+        for row in data:
+            table.add_row(*[str(row.get(col, "")) for col in columns])
+            
+        return table
+
+class DisplayState(BaseModel):
+    """Base model for display states with enhanced metadata."""
+    
+    identifier: str
+    source_name: str
+    first_timestamp: datetime.datetime
+    tags: List[str] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    
+    def format_timestamp(self) -> str:
+        """Format timestamp for display."""
+        local_time = self.first_timestamp.astimezone()
+        return local_time.strftime("%I:%M:%S %p").lstrip("0").rjust(11)
+    
+    @abstractmethod
+    def render(self, renderer: BaseRenderer) -> RenderableType:
+        """Render the state's content."""
+        pass
+
+class ContentState(DisplayState):
+    """State for markdown/text content with enhanced formatting."""
+    
+    content: str = ""
+    format_type: str = "markdown"  # or "plain"
+    
+    def render(self, renderer: MarkdownRenderer) -> RenderableType:
+        if self.format_type == "markdown":
+            content = renderer.render(self.content)
+        else:
+            content = Text(self.content)
+            
+        return renderer.create_panel(
+            content,
+            f"[bold]Source: {self.source_name}[/]",
+            renderer.theme.styles["content"],
+            f"[italic]{self.format_timestamp()}[/]"
+        )
 
 class ActionState(DisplayState):
-    """
-    A display state to represent an 'action' call, such as a function or method invocation.
-
-    Attributes:
-        name: Name of the action/function (e.g., "download_file").
-        args: Arguments/parameters passed to the action.
-        result: The result or output from the action, if any.
-        is_error: Whether the action ended in an error state.
-        is_complete: Whether the action has finished processing.
-    """
+    """State for action/operation tracking with progress support."""
+    
     name: str
     args: dict
     result: Optional[str] = None
     is_error: bool = False
     is_complete: bool = False
-
-    def get_status_style(self) -> tuple[Union[str, Spinner], str, str]:
-        """
-        Determine the icon, text style, and border color based on current status.
+    progress: float = 0.0  # 0-1 for progress tracking
+    
+    def render(self, renderer: BaseRenderer) -> RenderableType:
+        # Create progress bar if incomplete
+        if not self.is_complete:
+            progress = Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                auto_refresh=False,
+            )
+            task = progress.add_task(
+                self.name.replace("_", " ").title(),
+                total=100,
+            )
+            progress.update(task, completed=int(self.progress * 100))
+            content = progress
+        else:
+            # Show completion status
+            status = "❌" if self.is_error else "✅"
+            style = "error" if self.is_error else "success"
+            content = Text(
+                f"{status} {self.name.replace('_', ' ').title()}",
+                style=renderer.theme.styles[style],
+            )
+            
+            # Add result if present
+            if self.result:
+                content = Group(
+                    content,
+                    Text("\n" + self.result, style=renderer.theme.styles[style]),
+                )
         
-        Returns:
-            (icon_or_spinner, text_style, border_style).
-        """
-        if self.is_complete:
-            if self.is_error:
-                return "❌", "red", "red"
-            return "✅", "green", "green3"
-        return RUNNING_SPINNER, "yellow", "gray50"
-
-    def render_panel(self, show_inputs: bool = True, show_outputs: bool = True) -> Panel:
-        """Render the action call in a panel, optionally showing inputs/outputs."""
-        icon, text_style, border_style = self.get_status_style()
-        table = Table.grid(padding=0, expand=True)
-
-        # Header row: an icon and the formatted action name
-        header = Table.grid(padding=1)
-        header.add_column(width=2)
-        header.add_column()
-        action_name = self.name.replace("_", " ").title()
-        header.add_row(icon, f"[{text_style} bold]{action_name}[/]")
-        table.add_row(header)
-
-        # Optionally display inputs/outputs
-        if show_inputs or show_outputs:
-            details = Table.grid(padding=(0, 2))
-            details.add_column(style="dim", width=9)
-            details.add_column()
-
-            if show_inputs and self.args:
-                details.add_row(
-                    "    Input:",
-                    rich.pretty.Pretty(self.args, indent_size=2, expand_all=True),
-                )
-
-            if show_outputs and self.is_complete and self.result is not None:
-                label = "Error" if self.is_error else "Output"
-                style = "red" if self.is_error else "green3"
-                details.add_row(
-                    f"    {label}:",
-                    f"[{style}]{self.result}[/]",
-                )
-
-            table.add_row(details)
-
-        return Panel(
-            table,
-            title=f"[bold]Source: {self.source_name}[/]",
-            subtitle=f"[italic]{self.format_timestamp()}[/]",
-            title_align="left",
-            subtitle_align="right",
-            border_style=border_style,
-            box=box.ROUNDED,
-            width=100,
-            padding=(0, 1),
+        return renderer.create_panel(
+            content,
+            f"[bold]Source: {self.source_name}[/]",
+            renderer.theme.styles["action"],
+            f"[italic]{self.format_timestamp()}[/]"
         )
-
 
 class DataState(DisplayState):
-    """
-    A display state for arbitrary data structures: lists, dict, JSON strings, etc.
-
-    The logic uses either:
-      - Rich's `Syntax` for JSON formatting (if the content is valid JSON or
-        can be converted to JSON).
-      - Rich's `Pretty` if it's a Python object that doesn't serialize nicely to JSON.
+    """State for structured data with flexible rendering options."""
     
-    Attributes:
-        data: Any Python object. If it can be JSON-serialized, it will be syntax-highlighted.
-    """
     data: Any
-
-    def _prepare_renderable(self) -> RenderableType:
-        """
-        Convert self.data into a Rich renderable. 
-        If it's recognized as a dict/list, use JSON syntax highlight. Otherwise, fallback to Pretty.
-        """
-        # 1) If it's already a Python dict/list, attempt to convert to JSON string
-        if isinstance(self.data, (dict, list)):
-            try:
-                as_json_str = json.dumps(self.data, indent=2)
-                return Syntax(as_json_str, "json", theme="monokai", line_numbers=False)
-            except (TypeError, ValueError):
-                # If JSON serialization fails, fallback to pretty
-                return rich.pretty.Pretty(self.data, expand_all=True)
-
-        # 2) If it's a string, check if it's valid JSON
-        if isinstance(self.data, str):
-            trimmed = self.data.strip()
-            if (trimmed.startswith("{") and trimmed.endswith("}")) or \
-               (trimmed.startswith("[") and trimmed.endswith("]")):
-                # Possibly JSON
-                try:
-                    parsed = json.loads(self.data)
-                    as_json_str = json.dumps(parsed, indent=2)
-                    return Syntax(as_json_str, "json", theme="monokai", line_numbers=False)
-                except (TypeError, ValueError):
-                    # Not valid JSON, just show as text
-                    return rich.pretty.Pretty(self.data)
-            else:
-                # Just show the text
-                return rich.pretty.Pretty(self.data)
-
-        # 3) Fallback to Pretty for anything else
-        return rich.pretty.Pretty(self.data, expand_all=True)
-
-    def render_panel(self) -> Panel:
-        """Render the data in a styled panel."""
-        content_renderable = self._prepare_renderable()
-        return Panel(
-            content_renderable,
-            title=f"[bold]Data from: {self.source_name}[/]",
-            subtitle=f"[italic]{self.format_timestamp()}[/]",
-            title_align="left",
-            subtitle_align="right",
-            border_style="magenta",
-            box=box.ROUNDED,
-            width=100,
-            padding=(0, 1),
+    render_mode: str = "auto"  # auto, json, table, or pretty
+    
+    def render(self, renderer: JsonRenderer) -> RenderableType:
+        if self.render_mode == "table" and isinstance(self.data, list):
+            table_renderer = TableRenderer(renderer.theme, renderer.layout)
+            content = table_renderer.render(self.data)
+        else:
+            content = renderer.render(self.data)
+            
+        return renderer.create_panel(
+            content,
+            f"[bold]Data from: {self.source_name}[/]",
+            renderer.theme.styles["data"],
+            f"[italic]{self.format_timestamp()}[/]"
         )
-
 
 class PrintHandler:
     """
-    A generic print handler using Rich for terminal-based visualization of:
-      - Text/Markdown content  (ContentState)
-      - Action calls/results   (ActionState)
-      - Arbitrary data         (DataState)
+    Advanced terminal printing handler with rich formatting support.
     
-    All managed within a Rich Live console.
-
-    Example usage:
-        handler = PrintHandler()
-        handler.start()
-
-        # Content
-        handler.on_content_update(
-            identifier="msg_1",
-            source_name="User",
-            timestamp=datetime.datetime.now(),
-            new_content="Hello, World!"
-        )
-
-        # Action call
-        handler.on_action_call(
-            identifier="action_1",
-            source_name="System",
-            timestamp=datetime.datetime.now(),
-            action_name="process_data",
-            args={"data": [1, 2, 3]}
-        )
-
-        # Action result
-        handler.on_action_result(
-            identifier="action_1",
-            is_error=False,
-            result="Process finished successfully."
-        )
-
-        # Arbitrary data
-        handler.on_data_update(
-            identifier="json_blob_1",
-            source_name="External API",
-            timestamp=datetime.datetime.now(),
-            data={"response": {"status": "ok", "items": [1,2,3]}}
-        )
-
-        handler.stop()
+    Features:
+    - Theme customization
+    - Multiple display modes
+    - Progress tracking
+    - Layout management
+    - Logging integration
+    - Custom renderers
     """
-
+    
     def __init__(
         self,
-        show_action_inputs: bool = True,
-        show_action_outputs: bool = True,
+        theme: Optional[ThemePreset] = None,
+        display_mode: DisplayMode = DisplayMode.FULL,
+        console: Optional[Console] = None,
     ):
-        self.show_action_inputs = show_action_inputs
-        self.show_action_outputs = show_action_outputs
-
+        self.theme = theme or ThemePreset.create_default()
+        self.display_mode = display_mode
+        self.console = console or Console()
+        self.layout = LayoutManager(self.console)
+        
+        # Initialize renderers
+        self.markdown_renderer = MarkdownRenderer(self.theme, self.layout)
+        self.json_renderer = JsonRenderer(self.theme, self.layout)
+        
         self.live: Optional[Live] = None
-        self.console = Console()
         self.states: Dict[str, DisplayState] = {}
-
+        
     def start(self) -> None:
-        """Begin the live rendering process."""
+        """Start live display updates."""
         if not self.live:
             self.live = Live(
                 console=self.console,
-                vertical_overflow="visible",
                 auto_refresh=True,
+                vertical_overflow="visible",
             )
         if not self.live.is_started:
             self.live.start()
-
+            
     def stop(self) -> None:
-        """Stop the live rendering process."""
+        """Stop live display updates."""
         if self.live and self.live.is_started:
             self.live.stop()
-
+            
+    def clear(self) -> None:
+        """Clear all display states."""
+        self.states.clear()
+        self.update_display()
+        
     def update_display(self) -> None:
-        """
-        Render all states in a single panel with a table layout.
-        This is automatically called at the end of each 'on_*' event method.
-        """
+        """Update the live display with current states."""
         if not self.live or not self.live.is_started:
             return
-
-        # Sort states by creation time so display is consistent
-        sorted_states = sorted(self.states.values(), key=lambda s: s.first_timestamp)
+            
+        # Sort states by timestamp
+        sorted_states = sorted(
+            self.states.values(),
+            key=lambda s: s.first_timestamp
+        )
         
         if not sorted_states:
             return
-
-        # Create main table for all states
+            
+        # Create main table
         table = Table(
             show_header=True,
             box=box.SIMPLE,
@@ -345,206 +348,149 @@ class PrintHandler:
             padding=(0, 1),
         )
         
-        # Configure columns
-        table.add_column("Time", style="dim", width=11)
-        table.add_column("Source", style="bold")
-        table.add_column("Status", width=3)
-        table.add_column("Content", ratio=1)
-
-        # Add each state as a row
-        for state in sorted_states:
-            time = state.format_timestamp()
-            source = state.source_name
+        # Add columns based on display mode
+        if self.display_mode == DisplayMode.FULL:
+            table.add_column("Time", style="dim", width=11)
+            table.add_column("Source", style="bold")
+            table.add_column("Type", width=8)
+            table.add_column("Content", ratio=1)
+        else:
+            table.add_column("Content", ratio=1)
             
-            if isinstance(state, ActionState):
-                # For actions, show status icon and formatted content
-                icon, text_style, _ = state.get_status_style()
-                action_name = state.name.replace("_", " ").title()
-                
-                content = Table.grid(padding=0, expand=True)
-                content.add_row(f"[{text_style} bold]{action_name}[/]")
-                
-                if self.show_action_inputs and state.args:
-                    content.add_row(
-                        Table.grid(padding=(0, 2))
-                        .add_row(
-                            "Input:",
-                            rich.pretty.Pretty(state.args, indent_size=2, expand_all=True)
-                        )
-                    )
-                
-                if self.show_action_outputs and state.is_complete and state.result is not None:
-                    label = "Error" if state.is_error else "Output"
-                    style = "red" if state.is_error else "green3"
-                    content.add_row(
-                        Table.grid(padding=(0, 2))
-                        .add_row(
-                            f"{label}:",
-                            f"[{style}]{state.result}[/]"
-                        )
-                    )
-                
-                table.add_row(time, source, icon, content)
-                
-            elif isinstance(state, ContentState):
-                # For content, show markdown
+        # Add rows for each state
+        for state in sorted_states:
+            if self.display_mode == DisplayMode.FULL:
+                if isinstance(state, ContentState):
+                    renderer = self.markdown_renderer
+                    type_icon = "📝"
+                elif isinstance(state, ActionState):
+                    renderer = self.markdown_renderer
+                    type_icon = "⚡"
+                else:  # DataState
+                    renderer = self.json_renderer
+                    type_icon = "📊"
+                    
                 table.add_row(
-                    time,
-                    source,
-                    "📝",
-                    Markdown(state.content)
+                    state.format_timestamp(),
+                    state.source_name,
+                    type_icon,
+                    state.render(renderer),
                 )
+            else:
+                # Compact mode - just show content
+                if isinstance(state, ContentState):
+                    content = Text(state.content)
+                elif isinstance(state, ActionState):
+                    status = "❌" if state.is_error else "✅"
+                    content = Text(f"{status} {state.name}")
+                else:
+                    content = Text(str(state.data))
+                table.add_row(content)
                 
-            elif isinstance(state, DataState):
-                # For data, show the formatted data
-                table.add_row(
-                    time,
-                    source,
-                    "📊",
-                    state._prepare_renderable()
-                )
-
-        # Wrap table in a panel
+        # Create main panel
         panel = Panel(
             table,
             title="[bold]Activity Log[/]",
-            border_style="blue",
+            border_style=self.theme.styles["info"],
             box=box.ROUNDED,
-            width=100,
             padding=(0, 1),
         )
         
-        self.live.update(panel, refresh=True)
-
-    # -------------------------
-    # Content events
-    # -------------------------
+        self.live.update(panel)
+        
     def on_content_update(
         self,
         identifier: str,
         source_name: str,
-        timestamp: datetime.datetime,
-        new_content: Any,
+        content: Any,
+        format_type: str = "markdown",
+        tags: List[str] = None,
+        metadata: Dict[str, Any] = None,
     ) -> None:
-        """
-        For updating or creating a ContentState.
-        If the identifier doesn't exist, a new ContentState is created.
-        If it does exist, we update the existing state's content.
-        """
-        if identifier not in self.states:
-            state = ContentState(
-                identifier=identifier,
-                source_name=source_name,
-                first_timestamp=timestamp,
-            )
-            state.update_content(new_content)
-            self.states[identifier] = state
-        else:
-            existing_state = self.states[identifier]
-            if isinstance(existing_state, ContentState):
-                existing_state.update_content(new_content)
-            else:
-                # If it exists but is not ContentState, replace or handle differently
-                state = ContentState(
-                    identifier=identifier,
-                    source_name=source_name,
-                    first_timestamp=timestamp,
-                )
-                state.update_content(new_content)
-                self.states[identifier] = state
-
+        """Add or update content with enhanced metadata."""
+        state = ContentState(
+            identifier=identifier,
+            source_name=source_name,
+            first_timestamp=datetime.datetime.now(),
+            content=str(content),
+            format_type=format_type,
+            tags=tags or [],
+            metadata=metadata or {},
+        )
+        self.states[identifier] = state
         self.update_display()
-
-    # -------------------------
-    # Action events
-    # -------------------------
-    def on_action_call(
+        
+    def on_action_start(
         self,
         identifier: str,
         source_name: str,
-        timestamp: datetime.datetime,
         action_name: str,
         args: dict,
+        tags: List[str] = None,
+        metadata: Dict[str, Any] = None,
     ) -> None:
-        """
-        For creating or updating an ActionState with new arguments.
-        """
-        if identifier not in self.states:
-            self.states[identifier] = ActionState(
-                identifier=identifier,
-                source_name=source_name,
-                first_timestamp=timestamp,
-                name=action_name,
-                args=args,
-            )
-        else:
-            existing_state = self.states[identifier]
-            if isinstance(existing_state, ActionState):
-                existing_state.args = args
-            else:
-                # If it exists but not ActionState, overwrite or handle differently
-                self.states[identifier] = ActionState(
-                    identifier=identifier,
-                    source_name=source_name,
-                    first_timestamp=timestamp,
-                    name=action_name,
-                    args=args,
-                )
-
+        """Start tracking a new action."""
+        state = ActionState(
+            identifier=identifier,
+            source_name=source_name,
+            first_timestamp=datetime.datetime.now(),
+            name=action_name,
+            args=args,
+            tags=tags or [],
+            metadata=metadata or {},
+        )
+        self.states[identifier] = state
         self.update_display()
-
-    def on_action_result(
+        
+    def on_action_progress(
         self,
         identifier: str,
-        is_error: bool,
-        result: Optional[str],
+        progress: float,
     ) -> None:
-        """
-        Mark an existing ActionState as complete, storing its output or error info.
-        """
+        """Update action progress (0-1)."""
+        if identifier in self.states:
+            state = self.states[identifier]
+            if isinstance(state, ActionState):
+                state.progress = max(0.0, min(1.0, progress))
+                self.update_display()
+                
+    def on_action_complete(
+        self,
+        identifier: str,
+        result: Optional[str] = None,
+        is_error: bool = False,
+    ) -> None:
+        """Mark action as complete with optional result."""
         if identifier in self.states:
             state = self.states[identifier]
             if isinstance(state, ActionState):
                 state.is_complete = True
                 state.is_error = is_error
                 state.result = result
-
-        self.update_display()
-
-    # -------------------------
-    # Data events
-    # -------------------------
+                self.update_display()
+                
     def on_data_update(
         self,
         identifier: str,
         source_name: str,
-        timestamp: datetime.datetime,
-        data: Any
+        data: Any,
+        render_mode: str = "auto",
+        tags: List[str] = None,
+        metadata: Dict[str, Any] = None,
     ) -> None:
-        """
-        For creating or updating a DataState with arbitrary data (lists, dict, JSON, etc.).
-        """
-        if identifier not in self.states:
-            self.states[identifier] = DataState(
-                identifier=identifier,
-                source_name=source_name,
-                first_timestamp=timestamp,
-                data=data,
-            )
-        else:
-            existing_state = self.states[identifier]
-            if isinstance(existing_state, DataState):
-                existing_state.data = data
-            else:
-                # If the existing state isn't DataState, replace it or handle differently
-                self.states[identifier] = DataState(
-                    identifier=identifier,
-                    source_name=source_name,
-                    first_timestamp=timestamp,
-                    data=data,
-                )
-
+        """Add or update data state."""
+        state = DataState(
+            identifier=identifier,
+            source_name=source_name,
+            first_timestamp=datetime.datetime.now(),
+            data=data,
+            render_mode=render_mode,
+            tags=tags or [],
+            metadata=metadata or {},
+        )
+        self.states[identifier] = state
         self.update_display()
-# At the very end of ui/print_handler.py, add:
-print_handler_instance = PrintHandler()
-print_handler_instance.start()
+
+# Create global instance
+print_handler = PrintHandler()
+print_handler.start()
