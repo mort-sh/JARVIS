@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich import box
 from datetime import datetime
-from ui.print_handler import print_handler_instance as print_handler
+from ui.print_handler import advanced_console as console
 console = Console()
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -82,7 +82,7 @@ class CommandLibrary:
         
         if warnings:
             warning_text = "Registered commands:\n" + "\n".join(f"[yellow]WARNING: {w}[/yellow]" for w in warnings)
-            print_handler.on_content_update("command_warnings", "CommandLibrary", datetime.now(), warning_text)
+            console.log(warning_text)
 
     def process_text(self, text: str, dialog: Optional[Any] = None) -> str:
         """
@@ -117,7 +117,7 @@ class CommandLibrary:
             pyperclip.copy(text)
             return text
         except pyperclip.PyperclipException as e:
-            print_handler.on_content_update("copy_error", "CommandLibrary", datetime.now(), f"[red]ERROR: Failed to copy text: {e}")
+            console.log(f"[red]ERROR: Failed to copy text: {e}")
             return ""
 
     def command_format(self, text: str, dialog: Optional[Any] = None) -> str:
@@ -130,7 +130,7 @@ class CommandLibrary:
             pyperclip.copy(wrapped_text)
             return wrapped_text
         except pyperclip.PyperclipException as e:
-            print_handler.on_content_update("clipboard_error", "CommandLibrary", datetime.now(), f"[red]ERROR: Clipboard error: {e}")
+            console.log(f"[red]ERROR: Clipboard error: {e}")
             return ""
 
     def command_code(self, text: str, dialog: Optional[Any] = None) -> str:
@@ -157,7 +157,7 @@ class CommandLibrary:
             else:
                 return ""
         except pyperclip.PyperclipException as e:
-            print_handler.on_content_update("code_clipboard_error", "CommandLibrary", datetime.now(), f"[red]ERROR: Failed to process clipboard content: {e}")
+            console.log(f"[red]ERROR: Failed to process clipboard content: {e}")
             return ""
 
     def command_exit(self, text: str, dialog: Optional[Any] = None) -> str:
@@ -180,7 +180,7 @@ class CommandLibrary:
             keyboard.write(text, delay=0.01)
             return None
         except Exception as e:
-            print_handler.on_content_update("command_talk_error", "CommandLibrary", datetime.now(), f"[red]ERROR: Failed to simulate keyboard input: {e}")
+            console.log(f"[red]ERROR: Failed to simulate keyboard input: {e}")
             return None
 
 
@@ -239,22 +239,10 @@ class CommandLibrary:
     def print_registered_commands(self) -> None:
         """
         Prints all registered commands using the print handler.
-        Commands are sorted alphabetically and displayed in a formatted list.
+        Commands are sorted alphabetically and displayed in a formatted list within a box.
         """
-        print_handler.on_content_update(
-            "registered_cmd_header",
-            "CommandLibrary",
-            datetime.now(),
-            "[blue]Registered commands:[/blue]"
-        )
-        
-        for command in sorted(self.commands.keys()):
-            print_handler.on_content_update(
-                f"registered_cmd_{command}",
-                "CommandLibrary",
-                datetime.now(),
-                f"[magenta]- {command}[/magenta]"
-            )
+        commands_list = "\n".join(f"[magenta]- {command}[/magenta]" for command in sorted(self.commands.keys()))
+        console.print(Panel(commands_list, title="Registered commands", box=box.ROUNDED))
 
     def shutdown_threads(self) -> None:
         for thread, worker in list(self.active_threads):
