@@ -325,7 +325,7 @@ class PrintHandler:
 
     def update_display(self) -> None:
         """
-        Render all current states as panels and update the live display.
+        Render all states in a single panel with a table layout.
         This is automatically called at the end of each 'on_*' event method.
         """
         if not self.live or not self.live.is_started:
@@ -333,22 +333,88 @@ class PrintHandler:
 
         # Sort states by creation time so display is consistent
         sorted_states = sorted(self.states.values(), key=lambda s: s.first_timestamp)
+        
+        if not sorted_states:
+            return
 
-        panels = []
+        # Create main table for all states
+        table = Table(
+            show_header=True,
+            box=box.SIMPLE,
+            expand=True,
+            padding=(0, 1),
+        )
+        
+        # Configure columns
+        table.add_column("Time", style="dim", width=11)
+        table.add_column("Source", style="bold")
+        table.add_column("Status", width=3)
+        table.add_column("Content", ratio=1)
+
+        # Add each state as a row
         for state in sorted_states:
+            time = state.format_timestamp()
+            source = state.source_name
+            
             if isinstance(state, ActionState):
-                panels.append(
-                    state.render_panel(
-                        show_inputs=self.show_action_inputs,
-                        show_outputs=self.show_action_outputs,
+                # For actions, show status icon and formatted content
+                icon, text_style, _ = state.get_status_style()
+                action_name = state.name.replace("_", " ").title()
+                
+                content = Table.grid(padding=0, expand=True)
+                content.add_row(f"[{text_style} bold]{action_name}[/]")
+                
+                if self.show_action_inputs and state.args:
+                    content.add_row(
+                        Table.grid(padding=(0, 2))
+                        .add_row(
+                            "Input:",
+                            rich.pretty.Pretty(state.args, indent_size=2, expand_all=True)
+                        )
                     )
+                
+                if self.show_action_outputs and state.is_complete and state.result is not None:
+                    label = "Error" if state.is_error else "Output"
+                    style = "red" if state.is_error else "green3"
+                    content.add_row(
+                        Table.grid(padding=(0, 2))
+                        .add_row(
+                            f"{label}:",
+                            f"[{style}]{state.result}[/]"
+                        )
+                    )
+                
+                table.add_row(time, source, icon, content)
+                
+            elif isinstance(state, ContentState):
+                # For content, show markdown
+                table.add_row(
+                    time,
+                    source,
+                    "📝",
+                    Markdown(state.content)
                 )
-            else:
-                # ContentState or DataState or any other custom state
-                panels.append(state.render_panel())
+                
+            elif isinstance(state, DataState):
+                # For data, show the formatted data
+                table.add_row(
+                    time,
+                    source,
+                    "📊",
+                    state._prepare_renderable()
+                )
 
-        if panels:
-            self.live.update(Group(*panels), refresh=True)
+        # Wrap table in a panel
+        panel = Panel(
+            table,
+            title="[bold]Activity Log[/]",
+            border_style="blue",
+            box=box.ROUNDED,
+            width=100,
+            padding=(0, 1),
+        )
+        
+        self.live.update(panel, refresh=True)
 
     # -------------------------
     # Content events
