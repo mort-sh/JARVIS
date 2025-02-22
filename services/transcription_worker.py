@@ -21,10 +21,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich import box
 from datetime import datetime
-from ui.print_handler import PrintHandler
+from ui.print_handler import print_handler_instance as print_handler
 console = Console()
-print_handler = PrintHandler()
-print_handler.start()
 
 # Suppress the torch.load FutureWarning
 warnings.filterwarnings("ignore", category=FutureWarning, module="whisper")

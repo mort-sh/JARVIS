@@ -9,10 +9,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich import box
 from datetime import datetime
-from ui.print_handler import PrintHandler
+from ui.print_handler import print_handler_instance as print_handler
 console = Console()
-print_handler = PrintHandler()
-print_handler.start()
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pyperclip

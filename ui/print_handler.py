@@ -545,3 +545,6 @@ class PrintHandler:
                 )
 
         self.update_display()
+# At the very end of ui/print_handler.py, add:
+print_handler_instance = PrintHandler()
+print_handler_instance.start()
