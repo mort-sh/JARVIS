@@ -18,6 +18,7 @@ from ui.print_handler import PrintHandler
 from datetime import datetime
 print_handler = PrintHandler()
 print_handler.start()
+from rich.console import Console
 from rich.panel import Panel
 from rich import box
 console = Console()
