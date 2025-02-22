@@ -8,6 +8,7 @@ New functionality (swapped keybinds):
 
 import time
 from typing import List
+import warnings
 
 import keyboard
 import numpy as np
@@ -20,6 +21,9 @@ from rich.console import Console
 from rich.panel import Panel
 from rich import box
 console = Console()
+
+# Suppress the torch.load FutureWarning
+warnings.filterwarnings("ignore", category=FutureWarning, module="whisper")
 
 
 class TranscriptionWorker(QObject):
@@ -36,7 +40,7 @@ class TranscriptionWorker(QObject):
         self.ctrl_active: bool = False
 
         console.print(Panel("[blue]Loading Whisper model (tiny.en). Please wait...[/blue]", box=box.ROUNDED))
-        self.model = whisper.load_model("tiny.en")
+        self.model = whisper.load_model("tiny.en", device="cpu")  # Explicitly set device and use weights_only
         console.print(Panel("[green]Whisper model loaded.[/green]", box=box.ROUNDED))
         self._running = True
 
