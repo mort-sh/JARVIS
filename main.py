@@ -13,7 +13,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich import box
 from datetime import datetime
-from ui.print_handler import print_handler_instance as print_handler
+from ui.print_handler import advanced_console as console
 console = Console()
 
 from ui.popup_dialog import PopupDialog
@@ -54,7 +54,7 @@ def main() -> None:
     try:
         app.exec_()
     except KeyboardInterrupt:
-        print_handler.on_content_update("keyboard_interrupt", "Main", datetime.now(), "[red]Keyboard interrupt detected. Exiting application...[/red]")
+        console.log("[red]Keyboard interrupt detected. Exiting application...[/red]")
     finally:
         worker.stop()
         dialog.cmd_library.shutdown_threads()
