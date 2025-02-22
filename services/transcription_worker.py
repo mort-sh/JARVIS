@@ -1,11 +1,12 @@
 """
 Handles keyboard hooking, audio recording, transcription, and simulated typing.
 
-New functionality (swapped keybinds):
-- When just Right Shift is held (without Control), the transcription is emitted via a signal for normal command processing.
-- When Control + Right Shift is held, the program records audio, transcribes it, and simulates typing the transcription (commands are not processed).
+Hotkey functionality:
+- Right Shift: Record audio and emit transcription for command processing
+- Control + Right Shift: Record audio and simulate typing (bypass commands)
 """
 
+from typing import Dict
 import time
 from typing import List
 import warnings
@@ -17,12 +18,11 @@ import soundfile as sf
 import whisper
 import logging
 from PyQt5.QtCore import QObject, pyqtSignal
-from rich.console import Console
 from rich.panel import Panel
+from rich.tree import Tree
 from rich import box
 from datetime import datetime
 from ui.print_handler import advanced_console as console
-console = Console()
 
 # Suppress the torch.load FutureWarning
 warnings.filterwarnings("ignore", category=FutureWarning, module="whisper")
@@ -31,6 +31,18 @@ warnings.filterwarnings("ignore", category=FutureWarning, module="whisper")
 class TranscriptionWorker(QObject):
     transcriptionReady = pyqtSignal(str)
 
+    # Centralized hotkey configuration
+    HOTKEY_DEFINITIONS: Dict[str, Dict[str, any]] = {
+        'right shift': {
+            'description': 'Record and emit transcription for command processing',
+            'requires_ctrl': False
+        },
+        'ctrl+right shift': {
+            'description': 'Record and simulate typing (bypass commands)',
+            'requires_ctrl': True
+        }
+    }
+
     def __init__(self, parent: QObject = None) -> None:
         super().__init__(parent)
         self.recording: bool = False
@@ -38,8 +50,6 @@ class TranscriptionWorker(QObject):
         self.start_time: float = 0.0
         self.audio_frames: List[np.ndarray] = []
         self.stream = None
-        # Flag to record if Control was held at the time recording started.
-        self.ctrl_active: bool = False
 
         console.log("[blue]Loading Whisper model (tiny.en). Please wait...[/blue]")
         self.model = whisper.load_model("tiny.en", device="cpu")  # Explicitly set device and use weights_only
@@ -56,8 +66,6 @@ class TranscriptionWorker(QObject):
             console.log("[blue]Recording started...[/blue]")
             self.audio_frames = []
             try:
-                # Capture whether Control is held when recording starts.
-                self.ctrl_active = keyboard.is_pressed("ctrl")
                 self.stream = sd.InputStream(
                     samplerate=self.fs,
                     channels=1,
@@ -84,12 +92,13 @@ class TranscriptionWorker(QObject):
                 sf.write(filename, audio_data, self.fs, subtype="PCM_32")
                 transcription = self.transcribe_and_send(filename)
                 if transcription:
-                    if self.ctrl_active:
-                        # Control was held: simulate typing of transcription (bypassing command processing).
+                    ctrl_held = keyboard.is_pressed("ctrl")
+                    if ctrl_held:
+                        # Control held: simulate typing of transcription (bypassing command processing)
                         console.log("[cyan]Simulating typing of transcription (Control + Right Shift held)...[/cyan]")
                         keyboard.write(transcription, delay=0.01)
                     else:
-                        # No Control held: emit transcription for normal command processing.
+                        # No Control held: emit transcription for normal command processing
                         console.log("[cyan]Emitting transcription for command processing (Right Shift only)...[/cyan]")
                         self.transcriptionReady.emit(transcription)
             else:
@@ -106,12 +115,24 @@ class TranscriptionWorker(QObject):
             console.log(f"[red bold]Transcription failed: {e}")
             return ""
 
+    def print_registered_hotkeys(self) -> None:
+        """Display registered hotkeys in a formatted panel."""
+        tree = Tree("Hotkeys")
+        for hotkey, config in self.HOTKEY_DEFINITIONS.items():
+            desc_start = 30
+            padding = "･" * (desc_start - len(hotkey))
+            hotkey_text = f"[cyan]{hotkey}[/cyan][dim]{padding}{config['description']}[/dim]"
+            tree.add(hotkey_text)
+        
+        console.print(Panel(tree, title="Registered Hotkeys", box=box.ROUNDED, expand=False))
+
     def run_keyboard_hook(self) -> None:
-        # Start recording when Right Shift is pressed and stop when released.
+        # Start recording when Right Shift is pressed and stop when released
         keyboard.on_press_key("right shift", lambda _: self.start_recording())
         keyboard.on_release_key("right shift", lambda _: self.stop_recording())
 
-        console.log("[blue]Press & hold Right Shift to record; release to transcribe.\n - Hold only Right Shift to simulate typing (commands bypassed).\n - Hold Control + Right Shift to emit transcription for command processing.[/blue]")
+        # Display registered hotkeys in a formatted panel
+        self.print_registered_hotkeys()
         while self._running:
             time.sleep(0.1)
 

@@ -7,6 +7,7 @@ import logging
 import re
 from rich.console import Console
 from rich.panel import Panel
+from rich.tree import Tree
 from rich import box
 from datetime import datetime
 from ui.print_handler import advanced_console as console
@@ -46,6 +47,14 @@ class CommandLibrary:
             "question",
             "explain",
         ],
+    }
+
+    COMMAND_DESC = {
+        "format": "Wraps clipboard text in markdown code blocks.",
+        "code": "Requests a code generation from the AI.",
+        "exit": "Exits the application.",
+        "talk": "Simulates typing the provided text.",
+        "query": "Handles general queries.",
     }
 
     PROMPTS: Dict[str, str] = {
@@ -238,11 +247,37 @@ class CommandLibrary:
 
     def print_registered_commands(self) -> None:
         """
-        Prints all registered commands using the print handler.
-        Commands are sorted alphabetically and displayed in a formatted list within a box.
+        Prints all registered commands using a tree structure.
+        Commands are organized by their categories from COMMAND_PHRASES.
+        Includes descriptions from COMMAND_DESC when available, aligned vertically.
         """
-        commands_list = "\n".join(f"[magenta]- {command}[/magenta]" for command in sorted(self.commands.keys()))
-        console.print(Panel(commands_list, title="Registered commands", box=box.ROUNDED, expand=False))
+        tree = Tree("r_shift")
+        
+        # Calculate padding needed for alignment (tree prefix + longest category)
+        # Tree prefix is "├── " or "└── " (4 chars)
+        prefix_len = 4
+        max_category_len = max(len(category) for category in self.COMMAND_PHRASES.keys())
+        # Increase extra padding from 5 to 10 for more space before the description
+        desc_start = prefix_len + max_category_len + 30
+        
+        # Create branches for each command category
+        for category, phrases in self.COMMAND_PHRASES.items():
+            # Get description if available
+            desc = self.COMMAND_DESC.get(category, "")
+            category_text = f"[cyan]{category}[/cyan]"
+            if desc:
+                # Pad the category name to align all descriptions
+                padding = "･" * (desc_start - prefix_len - len(category))
+                category_text += f"[dim]{padding}{desc}[/dim]"
+            
+            # Create a branch for the category
+            category_branch = tree.add(category_text)
+            
+            # Add leaves for each command phrase
+            for phrase in sorted(phrases):
+                category_branch.add(f"[magenta]{phrase}[/magenta]")
+        
+        console.print(Panel(tree, title="Registered Commands", box=box.ROUNDED, expand=False))
 
     def shutdown_threads(self) -> None:
         for thread, worker in list(self.active_threads):
