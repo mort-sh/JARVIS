@@ -28,10 +28,8 @@ def main() -> None:
     dialog.set_font_size(15)
     dialog.setWindowOpacity(0.95)
 
-    # Print the list of registered commands.
-    print_handler.on_content_update("registered_cmd_header", "Main", datetime.now(), "[blue]Registered commands:[/blue]")
-    for command in sorted(dialog.cmd_library.commands.keys()):
-        print_handler.on_content_update(f"registered_cmd_{command}", "Main", datetime.now(), f"[magenta]- {command}[/magenta]")
+    # Print the list of registered commands
+    dialog.cmd_library.print_registered_commands()
 
     # Create the transcription worker.
     worker = TranscriptionWorker()
@@ -52,16 +50,6 @@ def main() -> None:
     # Register hotkeys for adjusting font size.
     keyboard.add_hotkey("=", increase_font_size)
     keyboard.add_hotkey("-", decrease_font_size)
-
-    # # New hotkey: When RIGHT-CONTROL is released, simulate typing of the transcription.
-    # def simulate_typing() -> None:
-    #     if worker.last_transcription:
-    #         print("Simulating typing of transcription...")
-    #         keyboard.write(worker.last_transcription)
-    #     else:
-    #         print("No transcription available to type.")
-
-    # keyboard.on_release_key("right ctrl", lambda _: simulate_typing())
 
     try:
         app.exec_()

@@ -236,6 +236,26 @@ class CommandLibrary:
                 return text_lower.replace(phrase, "").strip()
         return text
 
+    def print_registered_commands(self) -> None:
+        """
+        Prints all registered commands using the print handler.
+        Commands are sorted alphabetically and displayed in a formatted list.
+        """
+        print_handler.on_content_update(
+            "registered_cmd_header",
+            "CommandLibrary",
+            datetime.now(),
+            "[blue]Registered commands:[/blue]"
+        )
+        
+        for command in sorted(self.commands.keys()):
+            print_handler.on_content_update(
+                f"registered_cmd_{command}",
+                "CommandLibrary",
+                datetime.now(),
+                f"[magenta]- {command}[/magenta]"
+            )
+
     def shutdown_threads(self) -> None:
         for thread, worker in list(self.active_threads):
             if thread.isRunning():
