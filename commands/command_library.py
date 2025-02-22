@@ -68,6 +68,7 @@ class CommandLibrary:
         self._initialize_commands()
 
     def _initialize_commands(self) -> None:
+        warnings = []
         for command, phrases in self.COMMAND_PHRASES.items():
             method_name = f"command_{command}"
             method = getattr(self, method_name, None)
@@ -75,7 +76,11 @@ class CommandLibrary:
                 for phrase in phrases:
                     self.commands[phrase.lower()] = method
             else:
-                console.print(Panel(f"[yellow]WARNING: Method '{method_name}' not found for command '{command}'.", box=box.ROUNDED))
+                warnings.append(f"Method '{method_name}' not found for command '{command}'")
+        
+        if warnings:
+            warning_text = "Registered commands:\n" + "\n".join(f"[yellow]WARNING: {w}[/yellow]" for w in warnings)
+            console.print(Panel(warning_text, box=box.ROUNDED))
 
     def process_text(self, text: str, dialog: Optional[Any] = None) -> str:
         """
