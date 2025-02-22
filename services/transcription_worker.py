@@ -6,9 +6,8 @@ Hotkey functionality:
 - Control + Right Shift: Record audio and simulate typing (bypass commands)
 """
 
-from typing import Dict
+from typing import Dict, List
 import time
-from typing import List
 import warnings
 
 import keyboard
@@ -20,9 +19,10 @@ import logging
 from PyQt5.QtCore import QObject, pyqtSignal
 from rich.panel import Panel
 from rich.tree import Tree
+from rich.text import Text
 from rich import box
 from datetime import datetime
-from ui.print_handler import advanced_console as console
+from ui.print_handler import advanced_console as console, RecordingState
 
 # Suppress the torch.load FutureWarning
 warnings.filterwarnings("ignore", category=FutureWarning, module="whisper")
@@ -50,11 +50,45 @@ class TranscriptionWorker(QObject):
         self.start_time: float = 0.0
         self.audio_frames: List[np.ndarray] = []
         self.stream = None
-
+        
+        # Create recording state
+        self.recording_state = RecordingState()
+        
+        # Create live display
+        self.live = None
+        
         console.log("[blue]Loading Whisper model (tiny.en). Please wait...[/blue]")
         self.model = whisper.load_model("tiny.en", device="cpu")  # Explicitly set device and use weights_only
         console.log("[green]Whisper model loaded.[/green]")
         self._running = True
+        
+    def calculate_volume_level(self) -> float:
+        """Calculate the current volume level from recent audio frames."""
+        if not self.audio_frames:
+            return 0.0
+        
+        # Get the most recent frame
+        recent_frame = self.audio_frames[-1]
+        # Calculate RMS value and normalize
+        rms = np.sqrt(np.mean(np.square(recent_frame)))
+        # Convert to a 0-1 range with some scaling for better visualization
+        normalized = min(rms * 5, 1.0)  # Scale up by 5x but cap at 1.0
+        return normalized
+        
+    def update_recording_state(self) -> None:
+        """Update the recording state with current values."""
+        if self.recording:
+            duration = time.time() - self.start_time
+            volume = self.calculate_volume_level()
+        else:
+            duration = 0.0
+            volume = 0.0
+            
+        self.recording_state.update(
+            is_recording=self.recording,
+            duration=duration,
+            volume_level=volume
+        )
 
     def audio_callback(self, indata: np.ndarray, frames: int, time_info: dict, status) -> None:
         if status:
@@ -63,7 +97,6 @@ class TranscriptionWorker(QObject):
 
     def start_recording(self) -> None:
         if not self.recording:
-            console.log("[blue]Recording started...[/blue]")
             self.audio_frames = []
             try:
                 self.stream = sd.InputStream(
@@ -75,6 +108,10 @@ class TranscriptionWorker(QObject):
                 self.stream.start()
                 self.start_time = time.time()
                 self.recording = True
+                
+                # Update recording state immediately
+                self.update_recording_state()
+                
             except Exception as e:
                 console.log(f"[red]Failed to start recording: {e}[/red]")
 
@@ -84,39 +121,97 @@ class TranscriptionWorker(QObject):
             self.stream.close()
             self.recording = False
             duration = time.time() - self.start_time
-            console.log(f"[blue]Recording stopped after {duration:.2f} seconds.[/blue]")
+            
+            # Update recording state one final time
+            self.update_recording_state()
 
             if duration > 0.5 and self.audio_frames:
+                # Set transcribing state
+                self.recording_state.update(
+                    is_recording=False,
+                    duration=duration,
+                    volume_level=0.0,
+                    transcribing=True
+                )
+                
                 audio_data = np.concatenate(self.audio_frames, axis=0)
                 filename = "temp.wav"
                 sf.write(filename, audio_data, self.fs, subtype="PCM_32")
                 transcription = self.transcribe_and_send(filename)
+                
                 if transcription:
                     ctrl_held = keyboard.is_pressed("ctrl")
                     if ctrl_held:
-                        # Control held: simulate typing of transcription (bypassing command processing)
-                        console.log("[cyan]Simulating typing of transcription (Control + Right Shift held)...[/cyan]")
+                        # Control held: simulate typing of transcription
                         keyboard.write(transcription, delay=0.01)
                     else:
-                        # No Control held: emit transcription for normal command processing
-                        console.log("[cyan]Emitting transcription for command processing (Right Shift only)...[/cyan]")
+                        # No Control held: emit transcription for command processing
                         self.transcriptionReady.emit(transcription)
             else:
-                console.log("[yellow]Recording too short or no frames. No transcription performed.[/yellow]")
+                self.recording_state.update(
+                    is_recording=False,
+                    duration=0.0,
+                    volume_level=0.0,
+                    transcribing=False
+                )
 
     def transcribe_and_send(self, filename: str) -> str:
-        console.log("[blue]Transcribing audio...")
         try:
             result = self.model.transcribe(filename, fp16=False)
             transcription = result.get("text", "").strip()
-            console.log(f"[green]Transcription: {transcription}")
+            
+            # Reset recording state after transcription
+            self.recording_state.update(
+                is_recording=False,
+                duration=0.0,
+                volume_level=0.0,
+                transcribing=False
+            )
+            
             return transcription
         except Exception as e:
             console.log(f"[red bold]Transcription failed: {e}")
+            
+            # Reset recording state on error
+            self.recording_state.update(
+                is_recording=False,
+                duration=0.0,
+                volume_level=0.0,
+                transcribing=False
+            )
+            
             return ""
 
+    def get_status_panel(self) -> Panel:
+        """Get the current recording status panel."""
+        # Create status content with Rich styling
+        status_icon = "🔴" if self.recording else "⚪"
+        status_text = "Recording" if self.recording else "Ready"
+        if self.recording_state.transcribing:
+            status_text = "Transcribing..."
+            status_icon = "💭"
+        
+        duration = time.time() - self.start_time if self.recording else 0.0
+        volume = self.calculate_volume_level() if self.recording else 0.0
+        
+        # Use Rich's Text for styling
+        content = Text()
+        content.append(f"  {status_icon} {status_text}\n\n")
+        content.append(f"  Duration: {duration:.1f}s\n\n")
+        content.append(f"  Volume: {volume*100:.0f}%\n")
+        
+        return Panel(
+            content,
+            title="Recording Status",
+            box=box.ROUNDED,
+            padding=(1, 2)
+        )
+
     def print_registered_hotkeys(self) -> None:
-        """Display registered hotkeys in a formatted panel."""
+        """Display registered hotkeys and initial recording status panel."""
+        from rich.console import Group
+        
+        # Print hotkeys panel
         tree = Tree("Hotkeys")
         for hotkey, config in self.HOTKEY_DEFINITIONS.items():
             desc_start = 30
@@ -124,18 +219,31 @@ class TranscriptionWorker(QObject):
             hotkey_text = f"[cyan]{hotkey}[/cyan][dim]{padding}{config['description']}[/dim]"
             tree.add(hotkey_text)
         
-        console.print(Panel(tree, title="Registered Hotkeys", box=box.ROUNDED, expand=False))
+        # Create initial display
+        hotkeys_panel = Panel(tree, title="Registered Hotkeys", box=box.ROUNDED, expand=False)
+        console.print(hotkeys_panel)
+        print()  # Add a blank line between panels
+        
+        # Start live display and render initial status
+        console.start_live()
+        console.live_render(self.get_status_panel())
 
     def run_keyboard_hook(self) -> None:
         # Start recording when Right Shift is pressed and stop when released
         keyboard.on_press_key("right shift", lambda _: self.start_recording())
         keyboard.on_release_key("right shift", lambda _: self.stop_recording())
 
-        # Display registered hotkeys in a formatted panel
+        # Display registered hotkeys and start live status display
         self.print_registered_hotkeys()
+        
+        # Main update loop
         while self._running:
-            time.sleep(0.1)
+            if self.recording or self.recording_state.transcribing:
+                self.update_recording_state()
+                console.live_render(self.get_status_panel())
+            time.sleep(0.1)  # Update every 100ms
 
     def stop(self) -> None:
         self._running = False
+        console.stop_live()
         keyboard.unhook_all()
