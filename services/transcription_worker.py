@@ -16,6 +16,7 @@ import soundfile as sf
 import whisper
 import logging
 from PyQt5.QtCore import QObject, pyqtSignal
+from rich import print  # Added for beautified printing
 
 
 class TranscriptionWorker(QObject):
@@ -38,7 +39,7 @@ class TranscriptionWorker(QObject):
 
     def audio_callback(self, indata: np.ndarray, frames: int, time_info: dict, status) -> None:
         if status:
-            print(f"Audio callback status: {status}")
+            print(f"[yellow]Audio callback status:[/yellow] {status}")
         self.audio_frames.append(indata.copy())
 
     def start_recording(self) -> None:
@@ -76,11 +77,11 @@ class TranscriptionWorker(QObject):
                 if transcription:
                     if self.ctrl_active:
                         # Control was held: simulate typing of transcription (bypassing command processing).
-                        print("Simulating typing of transcription (Control + Right Shift held)...")
+                        print("[cyan]Simulating typing of transcription (Control + Right Shift held)...[/cyan]")
                         keyboard.write(transcription, delay=0.01)
                     else:
                         # No Control held: emit transcription for normal command processing.
-                        print("Emitting transcription for command processing (Right Shift only)...")
+                        print("[cyan]Emitting transcription for command processing (Right Shift only)...[/cyan]")
                         self.transcriptionReady.emit(transcription)
             else:
                 logging.info("Recording too short or no frames. No transcription performed.")
@@ -93,7 +94,7 @@ class TranscriptionWorker(QObject):
             logging.info("Transcription: %s", transcription)
             return transcription
         except Exception as e:
-            print(f"Transcription failed: {e}")
+            print(f"[red bold]Transcription failed:[/red bold] {e}")
             return ""
 
     def run_keyboard_hook(self) -> None:
