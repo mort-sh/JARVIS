@@ -14,7 +14,10 @@ from PyQt5.QtWidgets import (
     QLabel,
     QComboBox,
 )
-from rich.console import Console
+from ui.print_handler import PrintHandler
+from datetime import datetime
+print_handler = PrintHandler()
+print_handler.start()
 from rich.panel import Panel
 from rich import box
 console = Console()
@@ -235,7 +238,7 @@ class PopupDialog(QDialog):
 
     def set_font_size(self, size: int) -> None:
         if size < 1:
-            console.print(Panel("[red]Font size must be a positive integer.[/red]", box=box.ROUNDED))
+            print_handler.on_content_update("font_size_error", "PopupDialog", datetime.now(), "[red]Font size must be a positive integer.[/red]")
             return
         current_font = self.text_edit.font()
         current_font.setPointSize(size)

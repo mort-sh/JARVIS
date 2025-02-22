@@ -12,7 +12,11 @@ import logging
 from rich.console import Console
 from rich.panel import Panel
 from rich import box
+from datetime import datetime
+from ui.print_handler import PrintHandler
 console = Console()
+print_handler = PrintHandler()
+print_handler.start()
 
 from ui.popup_dialog import PopupDialog
 from services.transcription_worker import TranscriptionWorker
@@ -27,9 +31,9 @@ def main() -> None:
     dialog.setWindowOpacity(0.95)
 
     # Print the list of registered commands.
-    console.print(Panel("[blue]Registered commands:[/blue]", box=box.ROUNDED))
+    print_handler.on_content_update("registered_cmd_header", "Main", datetime.now(), "[blue]Registered commands:[/blue]")
     for command in sorted(dialog.cmd_library.commands.keys()):
-        console.print(Panel(f"[magenta]- {command}[/magenta]", box=box.ROUNDED))
+        print_handler.on_content_update(f"registered_cmd_{command}", "Main", datetime.now(), f"[magenta]- {command}[/magenta]")
 
     # Create the transcription worker.
     worker = TranscriptionWorker()
@@ -64,7 +68,7 @@ def main() -> None:
     try:
         app.exec_()
     except KeyboardInterrupt:
-        console.print(Panel("[red]Keyboard interrupt detected. Exiting application...[/red]", box=box.ROUNDED))
+        print_handler.on_content_update("keyboard_interrupt", "Main", datetime.now(), "[red]Keyboard interrupt detected. Exiting application...[/red]")
     finally:
         worker.stop()
         dialog.cmd_library.shutdown_threads()

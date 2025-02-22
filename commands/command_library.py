@@ -8,7 +8,11 @@ import re
 from rich.console import Console
 from rich.panel import Panel
 from rich import box
+from datetime import datetime
+from ui.print_handler import PrintHandler
 console = Console()
+print_handler = PrintHandler()
+print_handler.start()
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pyperclip
@@ -80,7 +84,7 @@ class CommandLibrary:
         
         if warnings:
             warning_text = "Registered commands:\n" + "\n".join(f"[yellow]WARNING: {w}[/yellow]" for w in warnings)
-            console.print(Panel(warning_text, box=box.ROUNDED))
+            print_handler.on_content_update("command_warnings", "CommandLibrary", datetime.now(), warning_text)
 
     def process_text(self, text: str, dialog: Optional[Any] = None) -> str:
         """
@@ -115,7 +119,7 @@ class CommandLibrary:
             pyperclip.copy(text)
             return text
         except pyperclip.PyperclipException as e:
-            console.print(Panel(f"[red]ERROR: Failed to copy text: {e}", box=box.ROUNDED))
+            print_handler.on_content_update("copy_error", "CommandLibrary", datetime.now(), f"[red]ERROR: Failed to copy text: {e}")
             return ""
 
     def command_format(self, text: str, dialog: Optional[Any] = None) -> str:
@@ -128,7 +132,7 @@ class CommandLibrary:
             pyperclip.copy(wrapped_text)
             return wrapped_text
         except pyperclip.PyperclipException as e:
-            console.print(Panel(f"[red]ERROR: Clipboard error: {e}", box=box.ROUNDED))
+            print_handler.on_content_update("clipboard_error", "CommandLibrary", datetime.now(), f"[red]ERROR: Clipboard error: {e}")
             return ""
 
     def command_code(self, text: str, dialog: Optional[Any] = None) -> str:
@@ -155,7 +159,7 @@ class CommandLibrary:
             else:
                 return ""
         except pyperclip.PyperclipException as e:
-            console.print(Panel(f"[red]ERROR: Failed to process clipboard content: {e}", box=box.ROUNDED))
+            print_handler.on_content_update("code_clipboard_error", "CommandLibrary", datetime.now(), f"[red]ERROR: Failed to process clipboard content: {e}")
             return ""
 
     def command_exit(self, text: str, dialog: Optional[Any] = None) -> str:

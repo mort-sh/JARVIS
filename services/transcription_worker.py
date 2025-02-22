@@ -20,7 +20,11 @@ from PyQt5.QtCore import QObject, pyqtSignal
 from rich.console import Console
 from rich.panel import Panel
 from rich import box
+from datetime import datetime
+from ui.print_handler import PrintHandler
 console = Console()
+print_handler = PrintHandler()
+print_handler.start()
 
 # Suppress the torch.load FutureWarning
 warnings.filterwarnings("ignore", category=FutureWarning, module="whisper")
@@ -39,9 +43,9 @@ class TranscriptionWorker(QObject):
         # Flag to record if Control was held at the time recording started.
         self.ctrl_active: bool = False
 
-        console.print(Panel("[blue]Loading Whisper model (tiny.en). Please wait...[/blue]", box=box.ROUNDED))
+        print_handler.on_content_update("whisper_loading", "TranscriptionWorker", datetime.now(), "[blue]Loading Whisper model (tiny.en). Please wait...[/blue]")
         self.model = whisper.load_model("tiny.en", device="cpu")  # Explicitly set device and use weights_only
-        console.print(Panel("[green]Whisper model loaded.[/green]", box=box.ROUNDED))
+        print_handler.on_content_update("whisper_loaded", "TranscriptionWorker", datetime.now(), "[green]Whisper model loaded.[/green]")
         self._running = True
 
     def audio_callback(self, indata: np.ndarray, frames: int, time_info: dict, status) -> None:
@@ -51,7 +55,7 @@ class TranscriptionWorker(QObject):
 
     def start_recording(self) -> None:
         if not self.recording:
-            console.print(Panel("[blue]Recording started...[/blue]", box=box.ROUNDED))
+            print_handler.on_content_update("recording_started", "TranscriptionWorker", datetime.now(), "[blue]Recording started...[/blue]")
             self.audio_frames = []
             try:
                 # Capture whether Control is held when recording starts.
@@ -66,7 +70,7 @@ class TranscriptionWorker(QObject):
                 self.start_time = time.time()
                 self.recording = True
             except Exception as e:
-                logging.error("Failed to start recording: %s", e)
+                print_handler.on_content_update("recording_error", "TranscriptionWorker", datetime.now(), f"[red]Failed to start recording: {e}[/red]")
 
     def stop_recording(self) -> None:
         if self.recording and self.stream is not None:
@@ -74,7 +78,7 @@ class TranscriptionWorker(QObject):
             self.stream.close()
             self.recording = False
             duration = time.time() - self.start_time
-            console.print(Panel(f"[blue]Recording stopped after {duration:.2f} seconds.[/blue]", box=box.ROUNDED))
+            print_handler.on_content_update("recording_stopped", "TranscriptionWorker", datetime.now(), f"[blue]Recording stopped after {duration:.2f} seconds.[/blue]")
 
             if duration > 0.5 and self.audio_frames:
                 audio_data = np.concatenate(self.audio_frames, axis=0)
@@ -91,17 +95,17 @@ class TranscriptionWorker(QObject):
                         console.print(Panel("[cyan]Emitting transcription for command processing (Right Shift only)...[/cyan]", box=box.ROUNDED))
                         self.transcriptionReady.emit(transcription)
             else:
-                console.print(Panel("[yellow]Recording too short or no frames. No transcription performed.[/yellow]", box=box.ROUNDED))
+                print_handler.on_content_update("recording_too_short", "TranscriptionWorker", datetime.now(), "[yellow]Recording too short or no frames. No transcription performed.[/yellow]")
 
     def transcribe_and_send(self, filename: str) -> str:
-        console.print(Panel("[blue]Transcribing audio...[/blue]", box=box.ROUNDED))
+        print_handler.on_content_update("transcribing_audio", "TranscriptionWorker", datetime.now(), "[blue]Transcribing audio...[/blue]")
         try:
             result = self.model.transcribe(filename, fp16=False)
             transcription = result.get("text", "").strip()
             console.print(Panel(f"[green]Transcription: {transcription}", box=box.ROUNDED))
             return transcription
         except Exception as e:
-            console.print(Panel(f"[red bold]Transcription failed: {e}", box=box.ROUNDED))
+            print_handler.on_content_update("transcription_failed", "TranscriptionWorker", datetime.now(), f"[red bold]Transcription failed: {e}")
             return ""
 
     def run_keyboard_hook(self) -> None:
@@ -109,7 +113,7 @@ class TranscriptionWorker(QObject):
         keyboard.on_press_key("right shift", lambda _: self.start_recording())
         keyboard.on_release_key("right shift", lambda _: self.stop_recording())
 
-        console.print(Panel("[blue]Press & hold Right Shift to record; release to transcribe.\n - Hold only Right Shift to simulate typing (commands bypassed).\n - Hold Control + Right Shift to emit transcription for command processing.[/blue]", box=box.ROUNDED))
+        print_handler.on_content_update("keyboard_hook_info", "TranscriptionWorker", datetime.now(), "[blue]Press & hold Right Shift to record; release to transcribe.\n - Hold only Right Shift to simulate typing (commands bypassed).\n - Hold Control + Right Shift to emit transcription for command processing.[/blue]")
         while self._running:
             time.sleep(0.1)
 
