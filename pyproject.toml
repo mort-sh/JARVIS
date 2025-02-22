@@ -33,6 +33,7 @@ dependencies = [
     "pyqt5-qt5==5.15.2",
     "keyboard>=0.13.5",
     "sounddevice>=0.5.1",
+    "rich>=13.9.4",
 ]
 
 
