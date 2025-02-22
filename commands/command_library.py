@@ -251,7 +251,7 @@ class CommandLibrary:
         Commands are organized by their categories from COMMAND_PHRASES.
         Includes descriptions from COMMAND_DESC when available, aligned vertically.
         """
-        tree = Tree("r_shift")
+        tree = Tree("r_shift", highlight=True, hide_root=True)
         
         # Calculate padding needed for alignment (tree prefix + longest category)
         # Tree prefix is "├── " or "└── " (4 chars)
