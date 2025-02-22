@@ -242,7 +242,7 @@ class CommandLibrary:
         Commands are sorted alphabetically and displayed in a formatted list within a box.
         """
         commands_list = "\n".join(f"[magenta]- {command}[/magenta]" for command in sorted(self.commands.keys()))
-        console.print(Panel(commands_list, title="Registered commands", box=box.ROUNDED))
+        console.print(Panel(commands_list, title="Registered commands", box=box.ROUNDED, expand=False))
 
     def shutdown_threads(self) -> None:
         for thread, worker in list(self.active_threads):
