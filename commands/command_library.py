@@ -182,7 +182,7 @@ class CommandLibrary:
             keyboard.write(text, delay=0.01)
             return None
         except Exception as e:
-            console.print(Panel(f"[red]ERROR: Failed to simulate keyboard input: {e}", box=box.ROUNDED))
+            print_handler.on_content_update("command_talk_error", "CommandLibrary", datetime.now(), f"[red]ERROR: Failed to simulate keyboard input: {e}")
             return None
 
 

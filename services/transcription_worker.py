@@ -50,7 +50,7 @@ class TranscriptionWorker(QObject):
 
     def audio_callback(self, indata: np.ndarray, frames: int, time_info: dict, status) -> None:
         if status:
-            console.print(Panel(f"[yellow]Audio callback status: {status}", box=box.ROUNDED))
+            print_handler.on_content_update("audio_callback_status", "TranscriptionWorker", datetime.now(), f"[yellow]Audio callback status: {status}")
         self.audio_frames.append(indata.copy())
 
     def start_recording(self) -> None:
@@ -88,11 +88,11 @@ class TranscriptionWorker(QObject):
                 if transcription:
                     if self.ctrl_active:
                         # Control was held: simulate typing of transcription (bypassing command processing).
-                        console.print(Panel("[cyan]Simulating typing of transcription (Control + Right Shift held)...[/cyan]", box=box.ROUNDED))
+                        print_handler.on_content_update("transcription_typing", "TranscriptionWorker", datetime.now(), "[cyan]Simulating typing of transcription (Control + Right Shift held)...[/cyan]")
                         keyboard.write(transcription, delay=0.01)
                     else:
                         # No Control held: emit transcription for normal command processing.
-                        console.print(Panel("[cyan]Emitting transcription for command processing (Right Shift only)...[/cyan]", box=box.ROUNDED))
+                        print_handler.on_content_update("transcription_emitting", "TranscriptionWorker", datetime.now(), "[cyan]Emitting transcription for command processing (Right Shift only)...[/cyan]")
                         self.transcriptionReady.emit(transcription)
             else:
                 print_handler.on_content_update("recording_too_short", "TranscriptionWorker", datetime.now(), "[yellow]Recording too short or no frames. No transcription performed.[/yellow]")
@@ -102,7 +102,7 @@ class TranscriptionWorker(QObject):
         try:
             result = self.model.transcribe(filename, fp16=False)
             transcription = result.get("text", "").strip()
-            console.print(Panel(f"[green]Transcription: {transcription}", box=box.ROUNDED))
+            print_handler.on_content_update("transcription_result", "TranscriptionWorker", datetime.now(), f"[green]Transcription: {transcription}")
             return transcription
         except Exception as e:
             print_handler.on_content_update("transcription_failed", "TranscriptionWorker", datetime.now(), f"[red bold]Transcription failed: {e}")
