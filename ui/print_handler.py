@@ -423,14 +423,53 @@ class AdvancedConsole:
         sep: str = " ",
         end: str = "\n",
         style: Union[str, Style, None] = None,
-        highlight: bool = False,
-        markup: bool = True,
+        justify: Optional[str] = None,
+        overflow: Optional[str] = None,
+        no_wrap: Optional[bool] = None,
+        emoji: Optional[bool] = None,
+        markup: Optional[bool] = True,
+        highlight: Optional[bool] = False,
+        width: Optional[int] = None,
+        crop: bool = True,
+        soft_wrap: Optional[bool] = None,
+        new_line_start: bool = False,
     ) -> None:
         """
         An enhanced drop-in replacement for Python's built-in print.
-        Supports markup, styling, and auto-highlighting of data structures.
+        Supports markup, styling, auto-highlighting, and additional formatting options.
+        
+        Args:
+            objects (positional args): Objects to log to the terminal.
+            sep (str, optional): String to write between print data. Defaults to " ".
+            end (str, optional): String to write at end of print data. Defaults to "\n".
+            style (Union[str, Style], optional): A style to apply to output. Defaults to None.
+            justify (str, optional): Justify method ("default", "left", "right", "center", or "full"). Defaults to None.
+            overflow (str, optional): Overflow method ("ignore", "crop", "fold", or "ellipsis"). Defaults to None.
+            no_wrap (Optional[bool], optional): Disable word wrapping. Defaults to None.
+            emoji (Optional[bool], optional): Enable emoji codes. Defaults to None.
+            markup (Optional[bool], optional): Enable markup. Defaults to True.
+            highlight (Optional[bool], optional): Enable automatic highlighting. Defaults to False.
+            width (Optional[int], optional): Width of output. Defaults to None.
+            crop (bool, optional): Crop output to terminal width. Defaults to True.
+            soft_wrap (Optional[bool], optional): Enable soft wrap mode. Defaults to None.
+            new_line_start (bool, optional): Insert a new line at the start if output spans multiple lines. Defaults to False.
         """
-        self.console.print(*objects, sep=sep, end=end, style=style, highlight=highlight, markup=markup)
+        self.console.print(
+            *objects,
+            sep=sep,
+            end=end,
+            style=style,
+            justify=justify,
+            overflow=overflow,
+            no_wrap=no_wrap,
+            emoji=emoji,
+            markup=markup,
+            highlight=highlight,
+            width=width,
+            crop=crop,
+            soft_wrap=soft_wrap,
+            new_line_start=new_line_start,
+        )
 
     # ------------------------------
     # Prompt/Input
