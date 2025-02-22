@@ -5,6 +5,7 @@ and functions that perform those commands.
 
 import logging
 import re
+from rich import print  # Added for beautified logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pyperclip
@@ -71,7 +72,7 @@ class CommandLibrary:
                 for phrase in phrases:
                     self.commands[phrase.lower()] = method
             else:
-                logging.warning(f"Method '{method_name}' not found for command '{command}'.")
+                print(f"[yellow]WARNING:[/yellow] Method '{method_name}' not found for command '{command}'.")
 
     def process_text(self, text: str, dialog: Optional[Any] = None) -> str:
         """
@@ -106,7 +107,7 @@ class CommandLibrary:
             pyperclip.copy(text)
             return text
         except pyperclip.PyperclipException as e:
-            logging.error(f"Failed to copy text: {e}")
+            print(f"[red]ERROR:[/red] Failed to copy text: {e}")
             return ""
 
     def command_format(self, text: str, dialog: Optional[Any] = None) -> str:
@@ -119,7 +120,7 @@ class CommandLibrary:
             pyperclip.copy(wrapped_text)
             return wrapped_text
         except pyperclip.PyperclipException as e:
-            logging.error(f"Clipboard error: {e}")
+            print(f"[red]ERROR:[/red] Clipboard error: {e}")
             return ""
 
     def command_code(self, text: str, dialog: Optional[Any] = None) -> str:
@@ -146,7 +147,7 @@ class CommandLibrary:
             else:
                 return ""
         except pyperclip.PyperclipException as e:
-            logging.error(f"Failed to process clipboard content: {e}")
+            print(f"[red]ERROR:[/red] Failed to process clipboard content: {e}")
             return ""
 
     def command_exit(self, text: str, dialog: Optional[Any] = None) -> str:
@@ -169,7 +170,7 @@ class CommandLibrary:
             keyboard.write(text, delay=0.01)
             return None
         except Exception as e:
-            logging.error(f"Failed to simulate keyboard input: {e}")
+            print(f"[red]ERROR:[/red] Failed to simulate keyboard input: {e}")
             return None
 
 

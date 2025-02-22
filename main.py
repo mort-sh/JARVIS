@@ -9,6 +9,7 @@ import threading
 import keyboard
 from PyQt5.QtWidgets import QApplication
 import logging
+from rich import print  # Added for beautified logging
 
 from ui.popup_dialog import PopupDialog
 from services.transcription_worker import TranscriptionWorker
@@ -23,9 +24,9 @@ def main() -> None:
     dialog.setWindowOpacity(0.95)
 
     # Print the list of registered commands.
-    logging.info("Registered commands:")
+    print("[blue]Registered commands:[/blue]")
     for command in sorted(dialog.cmd_library.commands.keys()):
-        logging.info(" - %s", command)
+        print(f"[magenta]- {command}[/magenta]")
 
     # Create the transcription worker.
     worker = TranscriptionWorker()
@@ -60,7 +61,7 @@ def main() -> None:
     try:
         app.exec_()
     except KeyboardInterrupt:
-        logging.info("Keyboard interrupt detected. Exiting application...")
+        print("[red]Keyboard interrupt detected. Exiting application...[/red]")
     finally:
         worker.stop()
         dialog.cmd_library.shutdown_threads()

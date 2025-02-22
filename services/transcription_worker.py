@@ -32,9 +32,9 @@ class TranscriptionWorker(QObject):
         # Flag to record if Control was held at the time recording started.
         self.ctrl_active: bool = False
 
-        logging.info("Loading Whisper model (tiny.en). Please wait...")
+        print("[blue]Loading Whisper model (tiny.en). Please wait...[/blue]")
         self.model = whisper.load_model("tiny.en")
-        logging.info("Whisper model loaded.")
+        print("[green]Whisper model loaded.[/green]")
         self._running = True
 
     def audio_callback(self, indata: np.ndarray, frames: int, time_info: dict, status) -> None:
@@ -44,7 +44,7 @@ class TranscriptionWorker(QObject):
 
     def start_recording(self) -> None:
         if not self.recording:
-            logging.info("Recording started...")
+            print("[blue]Recording started...[/blue]")
             self.audio_frames = []
             try:
                 # Capture whether Control is held when recording starts.
@@ -67,7 +67,7 @@ class TranscriptionWorker(QObject):
             self.stream.close()
             self.recording = False
             duration = time.time() - self.start_time
-            logging.info("Recording stopped after %.2f seconds.", duration)
+            print(f"[blue]Recording stopped after {duration:.2f} seconds.[/blue]")
 
             if duration > 0.5 and self.audio_frames:
                 audio_data = np.concatenate(self.audio_frames, axis=0)
@@ -84,14 +84,14 @@ class TranscriptionWorker(QObject):
                         print("[cyan]Emitting transcription for command processing (Right Shift only)...[/cyan]")
                         self.transcriptionReady.emit(transcription)
             else:
-                logging.info("Recording too short or no frames. No transcription performed.")
+                print("[yellow]Recording too short or no frames. No transcription performed.[/yellow]")
 
     def transcribe_and_send(self, filename: str) -> str:
-        logging.info("Transcribing audio...")
+        print("[blue]Transcribing audio...[/blue]")
         try:
             result = self.model.transcribe(filename, fp16=False)
             transcription = result.get("text", "").strip()
-            logging.info("Transcription: %s", transcription)
+            print(f"[green]Transcription:[/green] {transcription}")
             return transcription
         except Exception as e:
             print(f"[red bold]Transcription failed:[/red bold] {e}")
@@ -102,7 +102,7 @@ class TranscriptionWorker(QObject):
         keyboard.on_press_key("right shift", lambda _: self.start_recording())
         keyboard.on_release_key("right shift", lambda _: self.stop_recording())
 
-        logging.info("Press & hold Right Shift to record; release to transcribe.\n - Hold only Right Shift to simulate typing (commands bypassed).\n - Hold Control + Right Shift to emit transcription for command processing.")
+        print("[blue]Press & hold Right Shift to record; release to transcribe.\n - Hold only Right Shift to simulate typing (commands bypassed).\n - Hold Control + Right Shift to emit transcription for command processing.[/blue]")
         while self._running:
             time.sleep(0.1)
 
