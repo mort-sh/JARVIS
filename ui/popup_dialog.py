@@ -38,10 +38,10 @@ class PopupDialog(QDialog):
         self.setAttribute(Qt.WA_TranslucentBackground)
 
         self.resize(1000, 700)
-        self.center()
+        self.right_align()
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(27, 27, 27, 15)
+        layout.setContentsMargins(27, 27, 0, 15)  # Remove right margin
         layout.setSpacing(10)
 
         clear_button = QPushButton("Clear")
@@ -176,6 +176,12 @@ class PopupDialog(QDialog):
             }
             """
         )
+
+    def right_align(self) -> None:
+        """Align the dialog to the right side of the screen at full height."""
+        screen = QDesktopWidget().screenGeometry()
+        self.resize(1000, screen.height())
+        self.move(screen.width() - self.width(), 0)
 
     def center(self) -> None:
         screen = QDesktopWidget().screenGeometry()
