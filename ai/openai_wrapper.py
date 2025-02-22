@@ -46,6 +46,7 @@ except ImportError:
     logger.exception("Failed to import the required OpenAI library.")
     raise
 
+
 class OpenAIWrapper:
     """
     A wrapper around various OpenAI API endpoints. Can use the official
@@ -55,7 +56,7 @@ class OpenAIWrapper:
     def __init__(self) -> None:
         """
         Initializes the OpenAIWrapper, loading the API key from the environment and setting up model caching.
-        
+
         Raises:
             ValueError: If the 'OPENAI_API_KEY' environment variable is not set.
         """
@@ -68,10 +69,10 @@ class OpenAIWrapper:
 
         # Initialize model caching
         self._model_cache = {
-            'models': None,  # List of all models
-            'model_info': {},  # Cache for individual model details
-            'last_update': None,
-            'cache_duration': 3600  # Cache duration in seconds (1 hour)
+            "models": None,  # List of all models
+            "model_info": {},  # Cache for individual model details
+            "last_update": None,
+            "cache_duration": 3600,  # Cache duration in seconds (1 hour)
         }
 
         if USE_OFFICIAL_OPENAI:
@@ -81,13 +82,13 @@ class OpenAIWrapper:
         else:
             self.client = OpenAI(api_key=self.api_key)
             logger.debug("Using custom OpenAI client.")
-            
+
         # Initialize model capabilities mapping
         self._model_capabilities = {
             MODEL_TYPE_CHAT: ["gpt-4", "gpt-3.5"],
             MODEL_TYPE_AUDIO: ["whisper"],
             MODEL_TYPE_IMAGE: ["dall-e"],
-            MODEL_TYPE_EMBEDDING: ["text-embedding", "ada"]
+            MODEL_TYPE_EMBEDDING: ["text-embedding", "ada"],
         }
 
         # Initialize cache with models
@@ -100,8 +101,8 @@ class OpenAIWrapper:
         try:
             models = self.list_models()
             if models:
-                self._model_cache['models'] = models
-                self._model_cache['last_update'] = time.time()
+                self._model_cache["models"] = models
+                self._model_cache["last_update"] = time.time()
                 logger.debug("Model cache updated successfully")
         except Exception as e:
             logger.error("Failed to update model cache: %s", str(e))
@@ -109,40 +110,42 @@ class OpenAIWrapper:
     def _get_cached_model_info(self, model_id: str) -> Optional[Dict[str, Any]]:
         """
         Gets model info from cache or fetches it if not cached.
-        
+
         Args:
             model_id (str): The model ID to get info for
-            
+
         Returns:
             Optional[Dict[str, Any]]: The model info if available
         """
         # Check if cache needs refresh
-        if (not self._model_cache['last_update'] or 
-            time.time() - self._model_cache['last_update'] > self._model_cache['cache_duration']):
+        if (
+            not self._model_cache["last_update"]
+            or time.time() - self._model_cache["last_update"] > self._model_cache["cache_duration"]
+        ):
             self._update_model_cache()
 
         # Check if model info is in cache
-        if model_id not in self._model_cache['model_info']:
+        if model_id not in self._model_cache["model_info"]:
             try:
                 model_info = self.retrieve_model(model_id)
                 if model_info:
-                    self._model_cache['model_info'][model_id] = model_info
+                    self._model_cache["model_info"][model_id] = model_info
                     logger.debug("Added model %s to cache", model_id)
                 return model_info
             except Exception as e:
                 logger.warning("Failed to get info for model %s: %s", model_id, str(e))
                 return None
-        
-        return self._model_cache['model_info'].get(model_id)
+
+        return self._model_cache["model_info"].get(model_id)
 
     def _is_chat_model(self, model: str) -> bool:
         """
         Determines if a model supports the chat completions endpoint.
         Uses cached model info to avoid repeated API calls.
-        
+
         Args:
             model (str): The model ID to check
-            
+
         Returns:
             bool: True if the model supports chat completions, False otherwise
         """
@@ -151,30 +154,30 @@ class OpenAIWrapper:
             model_info = self._get_cached_model_info(model)
             if not model_info:
                 return False
-                
+
             # Check if model ID contains indicators of non-chat models
             non_chat_indicators = [
                 "realtime-preview",  # Realtime preview models use completions
-                "-preview",          # Preview models generally use completions
-                "instruct",         # Instruct models use completions
+                "-preview",  # Preview models generally use completions
+                "instruct",  # Instruct models use completions
             ]
-            
+
             return not any(indicator in model.lower() for indicator in non_chat_indicators)
         except Exception as e:
             logger.warning("Error checking model type: %s. Assuming not chat model.", str(e))
             return False
-            
+
     def get_valid_model(self, model_type: str = MODEL_TYPE_CHAT) -> str:
         """
         Returns a valid model ID from the list of available models based on the model type.
         Uses cached model list to avoid repeated API calls.
-        
+
         Args:
             model_type (str): The type of model to retrieve (chat, audio, image, embedding)
-            
+
         Returns:
             str: A valid model ID for the specified type
-            
+
         Raises:
             ValueError: If no valid model is found for the specified type
         """
@@ -182,41 +185,46 @@ class OpenAIWrapper:
             # If a specific model is requested via environment variable, use it
             env_model = os.getenv("OPENAI_MODEL")
             if env_model:
-                logger.info("Using model specified in OPENAI_MODEL environment variable: %s", env_model)
+                logger.info(
+                    "Using model specified in OPENAI_MODEL environment variable: %s", env_model
+                )
                 return env_model
-            
+
             # Check if cache needs refresh
-            if (not self._model_cache['models'] or 
-                not self._model_cache['last_update'] or 
-                time.time() - self._model_cache['last_update'] > self._model_cache['cache_duration']):
+            if (
+                not self._model_cache["models"]
+                or not self._model_cache["last_update"]
+                or time.time() - self._model_cache["last_update"]
+                > self._model_cache["cache_duration"]
+            ):
                 self._update_model_cache()
-                
-            if not self._model_cache['models']:
+
+            if not self._model_cache["models"]:
                 raise ValueError("Failed to retrieve available models")
-                
+
             # Filter models based on type
             valid_models = []
             type_prefixes = self._model_capabilities.get(model_type, [])
-            
-            for model in self._model_cache['models']:
-                model_id = model.id if hasattr(model, 'id') else model.get('id')
+
+            for model in self._model_cache["models"]:
+                model_id = model.id if hasattr(model, "id") else model.get("id")
                 if not model_id:
                     continue
-                    
+
                 # Check if model matches any prefix for the specified type
                 if any(model_id.startswith(prefix) for prefix in type_prefixes):
                     # For chat models, ensure it's compatible with chat completions
                     if model_type == MODEL_TYPE_CHAT and not self._is_chat_model(model_id):
                         continue
                     valid_models.append(model_id)
-            
+
             if not valid_models:
                 raise ValueError(f"No valid models found for type: {model_type}")
-            
+
             # Sort by version and return the latest
             sorted_models = sorted(valid_models, reverse=True)
             return sorted_models[0]
-            
+
         except Exception as e:
             logger.error("Error in get_valid_model: %s", str(e))
             # Fall back to default models based on type
@@ -224,10 +232,10 @@ class OpenAIWrapper:
                 MODEL_TYPE_CHAT: GLOBAL_DEFAULT_MODEL,
                 MODEL_TYPE_AUDIO: GLOBAL_DEFAULT_AUDIO_MODEL,
                 MODEL_TYPE_IMAGE: GLOBAL_DEFAULT_IMAGE_MODEL,
-                MODEL_TYPE_EMBEDDING: GLOBAL_DEFAULT_EMBEDDING_MODEL
+                MODEL_TYPE_EMBEDDING: GLOBAL_DEFAULT_EMBEDDING_MODEL,
             }
             return defaults.get(model_type, GLOBAL_DEFAULT_MODEL)
-            
+
     def send_prompt(
         self,
         prompt: Optional[str] = None,
@@ -249,7 +257,7 @@ class OpenAIWrapper:
             max_tokens (int): Maximum tokens to generate in the response.
             messages (Optional[List[Dict[str, str]]]): Pre-structured conversation messages.
             role (str): Role to assign to the prompt if building a messages list internally.
-            stream_callback (Optional[Callable[[str], None]]): 
+            stream_callback (Optional[Callable[[str], None]]):
                 If provided, will be called with chunks of text as they are generated (streaming).
 
         Returns:
@@ -259,27 +267,30 @@ class OpenAIWrapper:
             # Determine model type and get appropriate model
             if model == GLOBAL_DEFAULT_MODEL:
                 model = self.get_valid_model(MODEL_TYPE_CHAT)
-                
+
             # Validate or build messages/prompt
             if messages is None:
                 if not prompt:
                     raise ValueError("Either 'messages' or 'prompt' must be provided.")
                 messages = [{"role": role, "content": prompt}]
                 prompt = messages[0]["content"]  # For non-chat models
-            
+
             if not messages:
                 raise ValueError("'messages' must contain at least one message.")
-            
+
             # Check if model supports chat completions
             is_chat_model = self._is_chat_model(model)
-            logger.debug("Using model %s with %s endpoint", 
-                        model, 
-                        "chat completions" if is_chat_model else "completions")
+            logger.debug(
+                "Using model %s with %s endpoint",
+                model,
+                "chat completions" if is_chat_model else "completions",
+            )
 
             if is_chat_model:
                 # Use chat completions endpoint
                 if USE_OFFICIAL_OPENAI:
                     import openai
+
                     response = openai.ChatCompletion.create(
                         model=model,
                         messages=messages,
@@ -299,6 +310,7 @@ class OpenAIWrapper:
                 # Use completions endpoint
                 if USE_OFFICIAL_OPENAI:
                     import openai
+
                     response = openai.Completion.create(
                         model=model,
                         prompt=prompt,
@@ -323,7 +335,7 @@ class OpenAIWrapper:
                 else:
                     # Regular completions format
                     content = getattr(chunk.choices[0], "text", None)
-                    
+
                 if content:
                     assistant_reply += content
                     if stream_callback:
@@ -368,6 +380,7 @@ class OpenAIWrapper:
 
             if USE_OFFICIAL_OPENAI:
                 import openai
+
                 response = openai.ChatCompletion.create(
                     model=model,
                     messages=messages,
@@ -455,47 +468,50 @@ class OpenAIWrapper:
 
         Returns:
             Optional[List[Any]]: A list of model data if successful, None otherwise.
-            
+
         Note:
             Implements exponential backoff for rate limits and handles various API errors.
         """
         max_retries = 3
         base_delay = 1  # seconds
-        
+
         for attempt in range(max_retries):
             try:
                 if USE_OFFICIAL_OPENAI:
                     import openai
+
                     response = openai.Model.list()
                     return response["data"]
                 else:
                     response = self.client.models.list()
                     return response.data
-                    
+
             except RateLimitError as rate_err:
-                delay = base_delay * (2 ** attempt)
-                logger.warning(f"Rate limit hit, attempt {attempt + 1}/{max_retries}. "
-                             f"Waiting {delay} seconds...")
+                delay = base_delay * (2**attempt)
+                logger.warning(
+                    f"Rate limit hit, attempt {attempt + 1}/{max_retries}. "
+                    f"Waiting {delay} seconds..."
+                )
                 time.sleep(delay)
                 if attempt == max_retries - 1:
                     logger.error("Rate limit persisted after all retries")
                     return None
-                    
+
             except BadRequestError as bad_err:
                 logger.error("Invalid request when listing models: %s", str(bad_err))
                 return None
-                
+
             except APIError as api_err:
                 logger.error("API error when listing models: %s", str(api_err))
                 if attempt < max_retries - 1:
                     time.sleep(base_delay)
                     continue
                 return None
-                
+
             except Exception as exc:
                 logger.error("Unexpected error in list_models: %s", exc, exc_info=True)
                 return None
-                
+
         return None
 
     def retrieve_model(self, model_id: str) -> Optional[Dict[str, Any]]:
@@ -515,6 +531,7 @@ class OpenAIWrapper:
         try:
             if USE_OFFICIAL_OPENAI:
                 import openai
+
                 response = openai.Model.retrieve(model_id)
             else:
                 response = self.client.models.retrieve(model=model_id)
@@ -545,6 +562,7 @@ class OpenAIWrapper:
         try:
             if USE_OFFICIAL_OPENAI:
                 import openai
+
                 with open(file_path, "rb") as audio_file:
                     response = openai.Audio.transcribe(model=model, file=audio_file)
                 return response["text"]
@@ -588,11 +606,8 @@ class OpenAIWrapper:
         try:
             if USE_OFFICIAL_OPENAI:
                 import openai
-                response = openai.Image.create(
-                    prompt=prompt, 
-                    n=n, 
-                    size=size
-                )
+
+                response = openai.Image.create(prompt=prompt, n=n, size=size)
                 return [data["url"] for data in response["data"]]
             else:
                 response = self.client.images.generate(
