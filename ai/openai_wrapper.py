@@ -91,21 +91,29 @@ class OpenAIWrapper:
             MODEL_TYPE_EMBEDDING: ["text-embedding", "ada"],
         }
 
-        # Initialize cache with models
-        self._update_model_cache()
+        # Initialize cache but don't fetch models yet - they'll be fetched on first use
+        self._model_cache["last_update"] = None
 
-    def _update_model_cache(self) -> None:
+    def _update_model_cache(self, force: bool = False) -> None:
         """
-        Updates the model cache with fresh data from the API.
+        Updates the model cache with fresh data from the API if needed.
+        
+        Args:
+            force (bool): If True, forces a cache update regardless of time
         """
-        try:
-            models = self.list_models()
-            if models:
-                self._model_cache["models"] = models
-                self._model_cache["last_update"] = time.time()
-                logger.debug("Model cache updated successfully")
-        except Exception as e:
-            logger.error("Failed to update model cache: %s", str(e))
+        current_time = time.time()
+        cache_age = (current_time - self._model_cache["last_update"]) if self._model_cache["last_update"] else None
+        
+        # Only update if cache is empty, expired, or force update is requested
+        if force or not self._model_cache["models"] or (cache_age and cache_age > self._model_cache["cache_duration"]):
+            try:
+                models = self.list_models()
+                if models:
+                    self._model_cache["models"] = models
+                    self._model_cache["last_update"] = current_time
+                    logger.debug("Model cache updated successfully")
+            except Exception as e:
+                logger.error("Failed to update model cache: %s", str(e))
 
     def _get_cached_model_info(self, model_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -117,26 +125,20 @@ class OpenAIWrapper:
         Returns:
             Optional[Dict[str, Any]]: The model info if available
         """
-        # Check if cache needs refresh
-        if (
-            not self._model_cache["last_update"]
-            or time.time() - self._model_cache["last_update"] > self._model_cache["cache_duration"]
-        ):
-            self._update_model_cache()
+        # First check if the model info is already in cache
+        if model_id in self._model_cache["model_info"]:
+            return self._model_cache["model_info"][model_id]
 
-        # Check if model info is in cache
-        if model_id not in self._model_cache["model_info"]:
-            try:
-                model_info = self.retrieve_model(model_id)
-                if model_info:
-                    self._model_cache["model_info"][model_id] = model_info
-                    logger.debug("Added model %s to cache", model_id)
-                return model_info
-            except Exception as e:
-                logger.warning("Failed to get info for model %s: %s", model_id, str(e))
-                return None
-
-        return self._model_cache["model_info"].get(model_id)
+        # If not in cache, fetch it directly without updating the full model cache
+        try:
+            model_info = self.retrieve_model(model_id)
+            if model_info:
+                self._model_cache["model_info"][model_id] = model_info
+                logger.debug("Added model %s to cache", model_id)
+            return model_info
+        except Exception as e:
+            logger.warning("Failed to get info for model %s: %s", model_id, str(e))
+            return None
 
     def _is_chat_model(self, model: str) -> bool:
         """
@@ -190,7 +192,17 @@ class OpenAIWrapper:
                 )
                 return env_model
 
-            # Check if cache needs refresh
+            # For default models, return without API calls
+            defaults = {
+                MODEL_TYPE_CHAT: GLOBAL_DEFAULT_MODEL,
+                MODEL_TYPE_AUDIO: GLOBAL_DEFAULT_AUDIO_MODEL,
+                MODEL_TYPE_IMAGE: GLOBAL_DEFAULT_IMAGE_MODEL,
+                MODEL_TYPE_EMBEDDING: GLOBAL_DEFAULT_EMBEDDING_MODEL,
+            }
+            if model_type in defaults:
+                return defaults[model_type]
+
+            # Only fetch models if we need to find a non-default model
             if (
                 not self._model_cache["models"]
                 or not self._model_cache["last_update"]
