@@ -29,12 +29,16 @@ MODEL_TYPE_AUDIO = "audio"
 MODEL_TYPE_IMAGE = "image"
 MODEL_TYPE_EMBEDDING = "embedding"
 
+# Configure logging to only show warnings and above
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format="%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+# Also suppress openai library's logging
+logging.getLogger("openai").setLevel(logging.WARNING)
 
 try:
     if USE_OFFICIAL_OPENAI:
