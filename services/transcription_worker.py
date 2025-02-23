@@ -24,6 +24,13 @@ from rich import box
 from datetime import datetime
 from ui.print_handler import advanced_console as console, RecordingState
 
+# Configure logging to only show warnings and above
+logging.basicConfig(level=logging.WARNING)
+
+# Suppress specific loggers
+logging.getLogger("whisper").setLevel(logging.WARNING)
+logging.getLogger("sounddevice").setLevel(logging.WARNING)
+
 # Suppress the torch.load FutureWarning
 warnings.filterwarnings("ignore", category=FutureWarning, module="whisper")
 
@@ -50,6 +57,7 @@ class TranscriptionWorker(QObject):
         self.start_time: float = 0.0
         self.audio_frames: List[np.ndarray] = []
         self.stream = None
+        self.ctrl_pressed: bool = False  # Track ctrl state from start of recording
         
         # Create recording state
         self.recording_state = RecordingState()
@@ -95,7 +103,7 @@ class TranscriptionWorker(QObject):
             console.log(f"[yellow]Audio callback status: {status}")
         self.audio_frames.append(indata.copy())
 
-    def start_recording(self) -> None:
+    def start_recording(self, with_ctrl: bool = False) -> None:
         if not self.recording:
             self.audio_frames = []
             try:
@@ -108,6 +116,7 @@ class TranscriptionWorker(QObject):
                 self.stream.start()
                 self.start_time = time.time()
                 self.recording = True
+                self.ctrl_pressed = with_ctrl  # Store ctrl state at start
                 
                 # Update recording state immediately
                 self.update_recording_state()
@@ -140,12 +149,11 @@ class TranscriptionWorker(QObject):
                 transcription = self.transcribe_and_send(filename)
                 
                 if transcription:
-                    ctrl_held = keyboard.is_pressed("ctrl")
-                    if ctrl_held:
-                        # Control held: simulate typing of transcription
+                    if self.ctrl_pressed:
+                        # Control was held at start: simulate typing of transcription
                         keyboard.write(transcription, delay=0.01)
                     else:
-                        # No Control held: emit transcription for command processing
+                        # No Control at start: emit transcription for command processing
                         self.transcriptionReady.emit(transcription)
             else:
                 self.recording_state.update(
@@ -229,9 +237,17 @@ class TranscriptionWorker(QObject):
         console.live_render(self.get_status_panel())
 
     def run_keyboard_hook(self) -> None:
-        # Start recording when Right Shift is pressed and stop when released
-        keyboard.on_press_key("right shift", lambda _: self.start_recording())
-        keyboard.on_release_key("right shift", lambda _: self.stop_recording())
+        def on_right_shift_press(e):
+            # Check if ctrl is pressed when right shift is pressed
+            ctrl_pressed = keyboard.is_pressed('ctrl')
+            self.start_recording(with_ctrl=ctrl_pressed)
+
+        def on_right_shift_release(e):
+            self.stop_recording()
+
+        # Register both hotkey combinations
+        keyboard.on_press_key("right shift", on_right_shift_press)
+        keyboard.on_release_key("right shift", on_right_shift_release)
 
         # Display registered hotkeys and start live status display
         self.print_registered_hotkeys()
