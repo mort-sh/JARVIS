@@ -11,7 +11,15 @@
 
 ## Overview
 
-A powerful desktop assistant that combines voice transcription, AI-powered command processing, and a modern PyQt5-based UI. The application provides seamless integration with OpenAI's APIs for transcription, code generation, and conversational AI, all accessible through an elegant floating interface.
+A powerful desktop assistant that combines voice transcription, AI-powered command processing, and a modern PyQt5-based UI. The application provides seamless integration with OpenAI's APIs through UV (a high-performance custom client) for transcription, code generation, and conversational AI, all accessible through an elegant floating interface. Built for production use with robust error handling, rate limiting, and caching mechanisms.
+
+### Key Architecture Features
+
+- **UV Integration**: High-performance custom OpenAI client with enhanced reliability
+- **Model Caching**: Intelligent caching system for model information and capabilities
+- **Rate Limiting**: Automatic retry logic with exponential backoff
+- **Error Handling**: Comprehensive error capture and recovery strategies
+- **Streaming**: Efficient streaming response handling for real-time output
 
 ## Features
 
@@ -115,22 +123,103 @@ python main.py
 
 ## Configuration
 
-The application is configured through `config/settings.py` using a Settings class:
+### Environment Variables
+
+Create a `.env` file in the project root:
+```env
+OPENAI_API_KEY=your_api_key_here
+OPENAI_MODEL=optional_default_model  # Overrides the default model
+OPENAI_API_BASE=https://api.openai.com/v1  # Default API endpoint
+OPENAI_REBOOT_URL=https://api.openai.com/v1/reboot  # Endpoint for service reboot
+```
+
+### Settings Configuration
+
+The application is configured through `config/settings.py`:
 
 ```python
 class Settings:
-    # OpenAI API Configuration
-    USE_OFFICIAL_OPENAI = False  # Toggle between official/custom client
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
+    # Client Configuration
+    USE_OFFICIAL_OPENAI = False  # Toggle between UV and official client
+    
     # Model Defaults
-    GLOBAL_DEFAULT_MODEL = "gpt-4o"
+    GLOBAL_DEFAULT_MODEL = "gpt-4o"  # Latest GPT-4 model
     GLOBAL_DEFAULT_AUDIO_MODEL = "whisper-1"
     GLOBAL_DEFAULT_IMAGE_MODEL = "dall-e-3"
     GLOBAL_DEFAULT_EMBEDDING_MODEL = "text-embedding-ada-002"
+    
+    # API Configuration
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 ```
 
-The application maintains conversation history for context-aware responses and supports model selection through the UI.
+### Advanced Features
+
+- **Model Caching**: Caches model information for 1 hour to reduce API calls
+- **Automatic Model Selection**: Intelligently selects appropriate models based on task
+- **Rate Limit Handling**: Implements exponential backoff with configurable retry attempts
+- **Streaming Responses**: Efficient chunk-based streaming for real-time output
+- **Structured Output**: JSON schema validation for reliable code generation
+
+## Production Features
+
+### Error Handling
+
+The application implements comprehensive error handling:
+
+```python
+try:
+    response = wrapper.send_prompt(prompt)
+except RateLimitError as rate_err:
+    # Implement exponential backoff
+    delay = base_delay * (2**attempt)
+    time.sleep(delay)
+except BadRequestError as bad_err:
+    # Log invalid requests
+    logger.error("Invalid request: %s", str(bad_err))
+except APIError as api_err:
+    # Handle API-level errors
+    logger.error("API error: %s", str(api_err))
+```
+
+### Logging Configuration
+
+```python
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+```
+
+### Model Caching
+
+```python
+class OpenAIWrapper:
+    def __init__(self):
+        self._model_cache = {
+            "models": None,  # List of all models
+            "model_info": {},  # Cache for individual model details
+            "last_update": None,
+            "cache_duration": 3600,  # Cache duration in seconds (1 hour)
+        }
+```
+
+### Rate Limiting
+
+- Exponential backoff with configurable retry attempts
+- Automatic handling of rate limit headers
+- Configurable base delay and maximum retries
+- Intelligent request throttling
+
+### Streaming Response Handling
+
+```python
+def send_prompt(self, prompt: str, stream_callback: Optional[Callable] = None):
+    for chunk in response:
+        if content := chunk.choices[0].delta.content:
+            if stream_callback:
+                stream_callback(content)
+```
 
 ## Project Structure
 
@@ -233,20 +322,38 @@ qt_api = "pyqt5"
 
 ## Troubleshooting
 
-1. **Audio Recording Issues**:
-   - Ensure your microphone is properly connected
-   - Check system permissions for microphone access
-   - Verify sounddevice and soundfile are properly installed
+### API and Client Issues
+
+1. **UV Client Issues**:
+   - Check UV client configuration in settings.py
+   - Verify API base URL is accessible
+   - Ensure proper SSL certificate configuration
+   - Monitor rate limit headers in responses
 
 2. **OpenAI API Issues**:
-   - Verify your API key is correctly set in .env
-   - Check your API quota and limits
-   - Ensure internet connectivity
+   - Verify API key is correctly set in .env
+   - Check API quota and limits
+   - Monitor rate limit status
+   - Use reboot URL if service is unresponsive
+   - Check model availability and permissions
 
-3. **UI Issues**:
-   - For display problems, ensure PyQt5 is properly installed
-   - For font issues, verify system fonts
-   - For Rich text rendering issues, update rich package
+3. **Model Caching Issues**:
+   - Clear cache by restarting application
+   - Check cache duration settings
+   - Monitor cache hit/miss rates
+   - Verify model compatibility
+
+4. **Audio Recording Issues**:
+   - Ensure microphone is properly connected
+   - Check system permissions
+   - Verify sounddevice and soundfile installation
+   - Monitor audio buffer settings
+
+5. **UI Issues**:
+   - Verify PyQt5 installation
+   - Check system fonts
+   - Update rich package
+   - Monitor UI thread performance
 
 ## License
 
