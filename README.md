@@ -48,31 +48,94 @@ A powerful desktop assistant that combines voice transcription, AI-powered comma
 
 ## Installation
 
+### Prerequisites
+
+- Python 3.10 or higher
+- Git
+- A valid OpenAI API key
+
+### Installing UV Package Manager
+
+UV is a high-performance Python package manager written in Rust that this project uses for dependency management. It offers significant speed improvements over pip and more reliable dependency resolution.
+
+1. Install UV:
+   ```bash
+   # Windows (PowerShell)
+   iwr -useb https://astral.sh/uv/install.ps1 | iex
+   
+   # Unix/MacOS
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+### Project Setup
+
 1. Clone the repository:
    ```bash
-   git clone [repository-url]
+   git clone https://github.com/pjackim/jarvis.git
    cd jarvis
    ```
 
-2. Create and activate a virtual environment (Python 3.10+ required):
+2. Create and activate virtual environment with UV:
    ```bash
-   python -m venv venv
-   # Windows
-   .\venv\Scripts\activate
-   # Unix/MacOS
-   source venv/bin/activate
+   # Create venv using UV (faster than standard venv)
+   uv venv
+
+   # Activate on Windows
+   .venv/Scripts/activate
+
+   # Activate on macOS/Linux
+   source .venv/bin/activate
    ```
 
-3. Install required packages:
+3. Install dependencies with UV:
    ```bash
-   pip install numpy>=1.24.4 openai>=1.59.4 openai-whisper>=20240930 pyperclip>=1.9.0 \
-               python-dotenv>=1.0.1 soundfile>=0.13.0 pyqt5>=5.15.11 pyqt5-qt5==5.15.2 \
-               keyboard>=0.13.5 sounddevice>=0.5.1 rich>=13.9.4
+   # Install all dependencies from pyproject.toml
+   uv pip install -e .
    ```
 
-4. Create a `.env` file in the project root:
-   ```env
-   OPENAI_API_KEY=your_api_key_here
+4. Set up environment variables:
+   ```bash
+   # Create .env file
+   echo "OPENAI_API_KEY=your_api_key_here" > .env
+   ```
+
+   Replace `your_api_key_here` with your actual OpenAI API key.
+
+### Why UV?
+
+- **Speed**: 10-100x faster than pip for dependency resolution
+- **Reliability**: More reliable dependency resolution and installation
+- **Modern**: Native support for pyproject.toml and modern Python packaging
+- **Efficient**: Built-in virtual environment management
+- **Performance**: Optimized for modern Python development
+- **Caching**: Smart caching for faster subsequent installations
+
+### Troubleshooting
+
+1. **UV Command Not Found**
+   - Ensure UV is in your system PATH
+   - Try restarting your terminal
+   - On Windows, ensure PowerShell execution policy allows scripts
+
+2. **Dependency Resolution Issues**
+   - Clear UV cache: `uv cache clear`
+   - Update UV: `uv self update`
+   - Try with --verbose flag: `uv pip install -e . --verbose`
+
+3. **Virtual Environment Issues**
+   - If UV venv creation fails, try: `python -m venv .venv`
+   - Then install with: `uv pip install -e .`
+
+4. **Installation Verification**
+   ```bash
+   # Check Python version
+   python --version  # Should be 3.10 or higher
+
+   # Verify UV installation
+   uv --version
+
+   # Confirm virtual environment is active
+   # You should see (.venv) in your terminal prompt
    ```
 
 ## Usage
