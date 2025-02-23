@@ -24,12 +24,12 @@ from rich import box
 from datetime import datetime
 from ui.print_handler import advanced_console as console, RecordingState
 
-# Configure logging to only show warnings and above
-logging.basicConfig(level=logging.WARNING)
+# Configure logging to only show errors
+logging.basicConfig(level=logging.ERROR)
 
 # Suppress specific loggers
-logging.getLogger("whisper").setLevel(logging.WARNING)
-logging.getLogger("sounddevice").setLevel(logging.WARNING)
+logging.getLogger("whisper").setLevel(logging.ERROR)
+logging.getLogger("sounddevice").setLevel(logging.ERROR)
 
 # Suppress the torch.load FutureWarning
 warnings.filterwarnings("ignore", category=FutureWarning, module="whisper")

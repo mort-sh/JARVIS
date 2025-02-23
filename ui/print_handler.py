@@ -425,7 +425,7 @@ class AdvancedConsole:
         self,
         theme: Optional[ThemePreset] = None,
         auto_live_refresh: bool = True,
-        log_level: int = logging.INFO,
+        log_level: int = logging.ERROR,
     ):
         # Setup theme
         self.theme_preset = theme or ThemePreset.create_default()
