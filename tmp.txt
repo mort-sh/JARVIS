@@ -1,0 +1,11 @@
+
+uv pip install -e ".[dev]"
+uv pip install keyboard
+uv pip install pyqt5
+uv pip install rich
+uv pip install openai
+uv pip install openai-whisper
+uv pip install python-dotenv
+uv pip install pyperclip
+uv pip install sounddevice
+uv pip install soundfile
