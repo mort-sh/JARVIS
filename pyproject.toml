@@ -4,74 +4,159 @@ build-backend = "hatchling.build"
 
 [project]
 name = "JARVIS"
-version = "0.1.0"
-description = "A desktop assistant combining voice transcription, AI-powered command processing, and a modern PyQt5-based UI"
+version = "1.0.0"
+description = "Your AI assistant for automating tasks and enhancing productivity."
 readme = "README.md"
-requires-python = ">=3.10"
-license = "MIT"
-keywords = [
-    "openai",
-    "whisper",
-    "voice-transcription",
-    "desktop-assistant",
-    "pyqt5",
-    "ai",
-    "gpt",
-]
-authors = [
-    { name = "Parker Jackim", email = "parkerwjackim@gamil.com" }
-]
-
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [{ name = "mort-sh" }]
+keywords = ["git", "commit", "ai", "openai", "automation"]
 dependencies = [
-    "numpy>=1.24.4",
-    "openai>=1.59.4",
-    "openai-whisper>=20240930",
-    "pyperclip>=1.9.0",
-    "python-dotenv>=1.0.1",
-    "soundfile>=0.13.0",
-    "pyqt5>=5.15.11",
-    "pyqt5-qt5==5.15.2",
-    "keyboard>=0.13.5",
+    "openai>=1.70.0",
+    "prompt-toolkit>=3.0.50",
+    "requests>=2.32.3",
     "sounddevice>=0.5.1",
-    "rich>=13.9.4",
+    "soundfile>=0.13.1",
+    "vosk>=0.3.45",
+    "wave>=0.0.2",
+    "whisperx>=3.3.1",
+    "torch>=2.6.0",
+    "torchvision>=0.21.0",
+    "torchaudio>=2.6.0",
 ]
 
 
-[tool.hatch.build.targets.wheel]
-packages = ["ai", "commands", "config", "services", "ui"]
-
-[tool.black]
-line-length = 100
-target-version = ["py310"]
-include = '\.pyi?$'
-
-[tool.isort]
-profile = "black"
-line_length = 100
-multi_line_output = 3
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
-ensure_newline_before_comments = true
-
-[tool.mypy]
-python_version = "3.10"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-disallow_untyped_decorators = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_no_return = true
-warn_unreachable = true
-
-[tool.pytest.ini_options]
-addopts = "-ra -q --cov=. --cov-report=term-missing"
-testpaths = ["tests"]
-qt_api = "pyqt5"
+[project.urls]
+"Homepage" = "https://github.com/mort-sh/AutomaticGitCommit"
+"Bug Tracker" = "https://github.com/mort-sh/AutomaticGitCommit/issues"
 
 [project.scripts]
-jarvis = "main:main"
+# jarvis = "jarvis.cli.cli:main"
+project_build = "scripts.build:main"
+project_clean = "scripts.clean:main"
+project_release = "scripts.release:main"
+
+package_build = "scripts.build:main"
+package_clean = "scripts.clean:main"
+package_release = "scripts.release:main"
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+
+[tool.coverage.run]
+source = ["jarvis"]
+
+
+# pyproject.toml
+
+[tool.ruff]
+# Assume Python 3.8+ compatibility. Adjust this to your project's minimum version.
+# e.g., "py37", "py39", "py310", "py311"
+target-version = "py312"
+
+# Define directories/files Ruff should ignore.
+# Add paths like 'docs/', 'tests/fixtures/', etc., if needed.
+# Standard exclusions for virtual environments, build artifacts, etc.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    "*/migrations/*",     # Often auto-generated, can be noisy
+]
+
+
+line-length = 100
+
+
+[tool.ruff.lint]
+
+select = [
+    "E",
+    "W",
+    "F",
+    "I",
+    "C90",
+    "N",
+    "UP",
+    "B",
+    "A",
+    "SIM",
+    # "TID",         # Usually prefer 'I' (isort)
+    "T20",
+    "PYI",
+    "PL",
+    "RUF",
+]
+
+
+
+
+
+ignore = [
+
+
+
+    "PLR0913",
+    "PLR0915",
+    "PLR2004",
+    "PLW2901",
+    "T201",
+]
+
+
+fixable = ["ALL"]
+
+unfixable = []
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+[tool.ruff.lint.isort]
+known-first-party = ["jarvis"]    # Using the actual project name
+force-sort-within-sections = true
+
+
+
+[tool.ruff.format]
+# Use double quotes, similar to Black and Google's recommendation.
+quote-style = "double"
+
+# Indent using spaces.
+indent-style = "space"
+
+# Skip magic trailing comma (Google style often omits it, Black adds it). Default is 'true'. Set to 'false' for Google style.
+skip-magic-trailing-comma = false # Set to true if you prefer Black's default
+
+# Use Ruff's preview formatting styles (recommended for latest improvements)
+preview = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["jarvis"]
+
+
+[tool.uv.sources.pytorch]
+url = "https://download.pytorch.org/whl/cu126"
