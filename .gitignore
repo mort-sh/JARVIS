@@ -21,3 +21,5 @@ __pypackages__
 \_pypackages\_
 .cache
 .pytest_cache
+
+.venv.wsl
