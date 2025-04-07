@@ -11,7 +11,7 @@
 
 ## Overview
 
-A powerful desktop assistant that combines voice transcription, AI-powered command processing, and a modern PyQt5-based UI. The application provides seamless integration with OpenAI's APIs through UV (a high-performance custom client) for transcription, code generation, and conversational AI, all accessible through an elegant floating interface. Built for production use with robust error handling, rate limiting, and caching mechanisms.
+A powerful desktop assistant that combines voice transcription, AI-powered command processing, and a modern PyQt6-based UI. The application provides seamless integration with OpenAI's APIs through UV (a high-performance custom client) for transcription, code generation, and conversational AI, all accessible through an elegant floating interface. Built for production use with robust error handling, rate limiting, and caching mechanisms.
 
 ### Key Architecture Features
 
@@ -363,7 +363,7 @@ PyTest configuration:
 [tool.pytest.ini_options]
 addopts = "-ra -q --cov=. --cov-report=term-missing"
 testpaths = ["tests"]
-qt_api = "pyqt5"
+qt_api = "pyqt6"
 ```
 
 ## Contributing
@@ -413,7 +413,7 @@ qt_api = "pyqt5"
    - Monitor audio buffer settings
 
 5. **UI Issues**:
-   - Verify PyQt5 installation
+   - Verify PyQt6 installation
    - Check system fonts
    - Update rich package
    - Monitor UI thread performance
@@ -425,6 +425,6 @@ MIT License. See LICENSE file for details.
 ## Acknowledgments
 
 - OpenAI for their powerful API and models
-- PyQt5 for the UI framework
+- PyQt6 for the UI framework
 - The Whisper team for the speech recognition model
 - Rich library for beautiful terminal output

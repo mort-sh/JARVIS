@@ -10,15 +10,15 @@ from rich.panel import Panel
 from rich.tree import Tree
 from rich import box
 from datetime import datetime
-from ui.print_handler import advanced_console as console
+from jarvis.ui.print_handler import advanced_console as console
 console = Console()
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pyperclip
-from PyQt5.QtCore import QThread
+from PyQt6.QtCore import QThread
 
-from ai.openai_wrapper import OpenAIWrapper
-from ui.workers.stream_worker import StreamWorker
+from jarvis.ai.openai_wrapper import OpenAIWrapper
+from jarvis.ui.workers.stream_worker import StreamWorker
 
 
 class CommandLibrary:
@@ -206,10 +206,19 @@ class CommandLibrary:
             prompt += f"\n```\n{pyperclip.paste()}\n```"
         
         messages = [{"role": "system", "content": self.PROMPTS["general_question"]}]
+        
+        # Check if dialog is a PopupDialog or a UIController
         if hasattr(dialog, "conversation_history") and dialog.conversation_history:
             for sender, content in dialog.conversation_history:
                 messages.append({"role": sender.lower(), "content": content})
+        
         messages.append({"role": "user", "content": prompt})
+
+        # Get the current model - different for PopupDialog vs UIController
+        if hasattr(dialog, "current_model") and dialog.current_model:
+            model = dialog.current_model
+        else:
+            model = "gpt-4o"
 
         worker_thread = QThread()
         worker = StreamWorker(
@@ -218,11 +227,19 @@ class CommandLibrary:
             messages=messages,
             temperature=0.7,
             max_tokens=512,
-            model=dialog.current_model if dialog and hasattr(dialog, "current_model") and dialog.current_model else "gpt-4o",
+            model=model,
+            controller=dialog if hasattr(dialog, "stream_assistant_chunk") else None,
         )
         worker.moveToThread(worker_thread)
 
-        worker.partialResult.connect(dialog.stream_assistant_update)
+        # Connect to the dialog or controller based on what's available
+        if hasattr(dialog, "stream_assistant_update"):
+            # Old-style PopupDialog
+            worker.partialResult.connect(dialog.stream_assistant_update)
+        elif hasattr(dialog, "stream_assistant_chunk"):
+            # Controller implementation
+            pass  # Connection already made in StreamWorker constructor
+            
         worker_thread.started.connect(worker.run)
         worker_thread.finished.connect(worker_thread.deleteLater)
         worker_thread.finished.connect(

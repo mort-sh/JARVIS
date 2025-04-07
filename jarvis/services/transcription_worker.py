@@ -6,33 +6,40 @@ Hotkey functionality:
 - Control + Right Shift: Record audio and simulate typing (bypass commands)
 """
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 import time
 import warnings
+import os
+import logging
+import tempfile
+from pathlib import Path
 
 import keyboard
 import numpy as np
-import sounddevice as sd
-import soundfile as sf
-import whisper
-import logging
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal
 from rich.panel import Panel
 from rich.tree import Tree
 from rich.text import Text
 from rich import box
 from datetime import datetime
-from ui.print_handler import advanced_console as console, RecordingState
+
+from jarvis.ui.print_handler import advanced_console as console, RecordingState
+
+# Import audio_handler
+from jarvis.audio import (
+    TranscriptionMode,
+    WhisperXModelSize,
+    record_microphone,
+    transcribe_audio,
+    visualize_audio,
+    clear_transcription_cache
+)
 
 # Configure logging to only show errors
 logging.basicConfig(level=logging.ERROR)
 
 # Suppress specific loggers
-logging.getLogger("whisper").setLevel(logging.ERROR)
 logging.getLogger("sounddevice").setLevel(logging.ERROR)
-
-# Suppress the torch.load FutureWarning
-warnings.filterwarnings("ignore", category=FutureWarning, module="whisper")
 
 
 class TranscriptionWorker(QObject):
@@ -50,14 +57,13 @@ class TranscriptionWorker(QObject):
         }
     }
 
-    def __init__(self, parent: QObject = None) -> None:
+    def __init__(self, parent: QObject = None, controller=None) -> None:
         super().__init__(parent)
         self.recording: bool = False
-        self.fs: int = 44100
         self.start_time: float = 0.0
-        self.audio_frames: List[np.ndarray] = []
-        self.stream = None
         self.ctrl_pressed: bool = False  # Track ctrl state from start of recording
+        self.controller = controller
+        self.temp_file = None
         
         # Create recording state
         self.recording_state = RecordingState()
@@ -65,29 +71,19 @@ class TranscriptionWorker(QObject):
         # Create live display
         self.live = None
         
-        console.log("[blue]Loading Whisper model (tiny.en). Please wait...[/blue]")
-        self.model = whisper.load_model("tiny.en", device="cpu")  # Explicitly set device and use weights_only
-        console.log("[green]Whisper model loaded.[/green]")
+        # Configure audio handler
+        self.transcription_mode = TranscriptionMode.WHISPERX
+        self.model_size = WhisperXModelSize.BASE
+        
+        console.log("[blue]Audio handler initialized.[/blue]")
         self._running = True
-        
-    def calculate_volume_level(self) -> float:
-        """Calculate the current volume level from recent audio frames."""
-        if not self.audio_frames:
-            return 0.0
-        
-        # Get the most recent frame
-        recent_frame = self.audio_frames[-1]
-        # Calculate RMS value and normalize
-        rms = np.sqrt(np.mean(np.square(recent_frame)))
-        # Convert to a 0-1 range with some scaling for better visualization
-        normalized = min(rms * 5, 1.0)  # Scale up by 5x but cap at 1.0
-        return normalized
         
     def update_recording_state(self) -> None:
         """Update the recording state with current values."""
         if self.recording:
             duration = time.time() - self.start_time
-            volume = self.calculate_volume_level()
+            # Volume level estimation is handled differently in audio_handler
+            volume = 0.5  # Default placeholder value
         else:
             duration = 0.0
             volume = 0.0
@@ -95,46 +91,44 @@ class TranscriptionWorker(QObject):
         self.recording_state.update(
             is_recording=self.recording,
             duration=duration,
-            volume_level=volume
+            volume_level=volume,
+            transcribing=False
         )
 
-    def audio_callback(self, indata: np.ndarray, frames: int, time_info: dict, status) -> None:
-        if status:
-            console.log(f"[yellow]Audio callback status: {status}")
-        self.audio_frames.append(indata.copy())
-
     def start_recording(self, with_ctrl: bool = False) -> None:
+        """Start recording audio."""
         if not self.recording:
-            self.audio_frames = []
             try:
-                self.stream = sd.InputStream(
-                    samplerate=self.fs,
-                    channels=1,
-                    dtype="float32",
-                    callback=self.audio_callback,
-                )
-                self.stream.start()
-                self.start_time = time.time()
+                # Create a temporary file
+                temp_dir = tempfile.gettempdir()
+                self.temp_file = os.path.join(temp_dir, "jarvis_recording.wav")
+                
+                # Set recording state
                 self.recording = True
+                self.start_time = time.time()
                 self.ctrl_pressed = with_ctrl  # Store ctrl state at start
                 
                 # Update recording state immediately
                 self.update_recording_state()
                 
+                # Start recording in a non-blocking way
+                # We don't actually start the recording here since audio_handler
+                # uses a blocking approach. Instead, we'll just set the state.
+                
             except Exception as e:
                 console.log(f"[red]Failed to start recording: {e}[/red]")
+                self.recording = False
 
     def stop_recording(self) -> None:
-        if self.recording and self.stream is not None:
-            self.stream.stop()
-            self.stream.close()
+        """Stop recording and process the audio."""
+        if self.recording:
             self.recording = False
             duration = time.time() - self.start_time
             
             # Update recording state one final time
             self.update_recording_state()
 
-            if duration > 0.5 and self.audio_frames:
+            if duration > 0.5:
                 # Set transcribing state
                 self.recording_state.update(
                     is_recording=False,
@@ -143,30 +137,62 @@ class TranscriptionWorker(QObject):
                     transcribing=True
                 )
                 
-                audio_data = np.concatenate(self.audio_frames, axis=0)
-                filename = "temp.wav"
-                sf.write(filename, audio_data, self.fs, subtype="PCM_32")
-                transcription = self.transcribe_and_send(filename)
-                
-                if transcription:
-                    if self.ctrl_pressed:
-                        # Control was held at start: simulate typing of transcription
-                        keyboard.write(transcription, delay=0.01)
-                    else:
-                        # No Control at start: emit transcription for command processing
-                        self.transcriptionReady.emit(transcription)
-            else:
-                self.recording_state.update(
-                    is_recording=False,
-                    duration=0.0,
-                    volume_level=0.0,
-                    transcribing=False
-                )
+                # Now actually record the audio (blocking)
+                # This is not ideal, but required for now due to how audio_handler works
+                try:
+                    console.log(f"[blue]Recording audio to {self.temp_file}...[/blue]")
+                    # Use non-visual mode since we can't do both keyboard hooking and visual recording
+                    record_microphone(self.temp_file, visual=False)
+                    transcription = self.transcribe_and_send(self.temp_file)
+                    
+                    if transcription:
+                        if self.ctrl_pressed:
+                            # Control was held at start: simulate typing of transcription
+                            keyboard.write(transcription, delay=0.01)
+                        else:
+                            # No Control at start: emit transcription for command processing
+                            self.transcriptionReady.emit(transcription)
+                        
+                        # Also emit on the controller if available
+                        if hasattr(self, 'controller') and hasattr(self.controller, 'transcription_result'):
+                            self.controller.transcription_result.emit(transcription)
+                except Exception as e:
+                    console.log(f"[red]Recording or transcription failed: {e}[/red]")
+            
+            # Reset recording state after transcription
+            self.recording_state.update(
+                is_recording=False,
+                duration=0.0,
+                volume_level=0.0,
+                transcribing=False
+            )
 
     def transcribe_and_send(self, filename: str) -> str:
+        """Transcribe audio file using audio_handler."""
         try:
-            result = self.model.transcribe(filename, fp16=False)
-            transcription = result.get("text", "").strip()
+            # Update UI
+            console.log("[blue]Transcribing audio...[/blue]")
+            self.recording_state.update(
+                is_recording=False,
+                duration=0.0,
+                volume_level=0.0,
+                transcribing=True
+            )
+            
+            # Perform transcription with WhisperX
+            transcription = transcribe_audio(
+                filename,
+                transcription_mode=self.transcription_mode,
+                whisperx_model_size=self.model_size,
+                whisperx_language="en"  # Force English
+            )
+            
+            # Clean up temp file
+            try:
+                if os.path.exists(filename):
+                    os.remove(filename)
+            except Exception as e:
+                console.log(f"[yellow]Failed to delete temporary file: {e}[/yellow]")
             
             # Reset recording state after transcription
             self.recording_state.update(
@@ -176,9 +202,13 @@ class TranscriptionWorker(QObject):
                 transcribing=False
             )
             
+            if transcription:
+                console.log(f"[green]Transcription successful: '{transcription}'[/green]")
+            
             return transcription
+            
         except Exception as e:
-            console.log(f"[red bold]Transcription failed: {e}")
+            console.log(f"[red bold]Transcription failed: {e}[/red bold]")
             
             # Reset recording state on error
             self.recording_state.update(
@@ -200,13 +230,15 @@ class TranscriptionWorker(QObject):
             status_icon = "💭"
         
         duration = time.time() - self.start_time if self.recording else 0.0
-        volume = self.calculate_volume_level() if self.recording else 0.0
         
         # Use Rich's Text for styling
         content = Text()
         content.append(f"  {status_icon} {status_text}\n\n")
         content.append(f"  Duration: {duration:.1f}s\n\n")
-        content.append(f"  Volume: {volume*100:.0f}%\n")
+        
+        # Volume visualization is basic since audio_handler visualize_audio isn't directly usable here
+        bar = "█" * 10 if self.recording else "░" * 10
+        content.append(f"  Volume: {bar}\n")
         
         return Panel(
             content,
@@ -260,6 +292,8 @@ class TranscriptionWorker(QObject):
             time.sleep(0.1)  # Update every 100ms
 
     def stop(self) -> None:
+        """Stop the worker and clean up resources."""
         self._running = False
         console.stop_live()
         keyboard.unhook_all()
+        clear_transcription_cache()  # Clean up audio_handler models
