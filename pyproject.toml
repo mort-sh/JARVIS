@@ -19,8 +19,6 @@ dependencies = [
     "soundfile>=0.13.1",
     "vosk>=0.3.45",
     "wave>=0.0.2",
-    "whisperx>=3.3.1",
-    "faster-whisper>=0.5.1",
     "torch>=2.6.0",
     "torchvision>=0.21.0",
     "torchaudio>=2.6.0",
@@ -29,23 +27,21 @@ dependencies = [
     "rich>=14.0.0",
     "pyqt6>=6.8.1",
     "pydantic-ai>=0.0.52",
+    "whisperx>=3.3.1",
+    "pyannote-audio>=3.3.2",
 ]
-
 
 [project.urls]
 "Homepage" = "https://github.com/mort-sh/AutomaticGitCommit"
 "Bug Tracker" = "https://github.com/mort-sh/AutomaticGitCommit/issues"
 
 [project.scripts]
-# jarvis = "jarvis.cli.cli:main"
 project_build = "scripts.build:main"
 project_clean = "scripts.clean:main"
 project_release = "scripts.release:main"
-
 package_build = "scripts.build:main"
 package_clean = "scripts.clean:main"
 package_release = "scripts.release:main"
-
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -55,117 +51,58 @@ python_functions = "test_*"
 [tool.coverage.run]
 source = ["jarvis"]
 
-
-# pyproject.toml
-
 [tool.ruff]
-# Assume Python 3.8+ compatibility. Adjust this to your project's minimum version.
-# e.g., "py37", "py39", "py310", "py311"
 target-version = "py312"
-
-# Define directories/files Ruff should ignore.
-# Add paths like 'docs/', 'tests/fixtures/', etc., if needed.
-# Standard exclusions for virtual environments, build artifacts, etc.
 exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".ipynb_checkpoints",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pyenv",
-    ".pytest_cache",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "venv",
-    "*/migrations/*",     # Often auto-generated, can be noisy
+    ".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".ipynb_checkpoints",
+    ".mypy_cache", ".nox", ".pants.d", ".pyenv", ".pytest_cache", ".pytype", ".ruff_cache",
+    ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist",
+    "node_modules", "venv", "*/migrations/*",
 ]
-
-
 line-length = 100
 
-
 [tool.ruff.lint]
-
 select = [
-    "E",
-    "W",
-    "F",
-    "I",
-    "C90",
-    "N",
-    "UP",
-    "B",
-    "A",
-    "SIM",
-    # "TID",         # Usually prefer 'I' (isort)
-    "T20",
-    "PYI",
-    "PL",
-    "RUF",
+    "E", "W", "F", "I", "C90", "N", "UP", "B", "A", "SIM", "T20", "PYI", "PL", "RUF",
 ]
-
-
-
-
-
 ignore = [
-
-
-
-    "PLR0913",
-    "PLR0915",
-    "PLR2004",
-    "PLW2901",
-    "T201",
+    "PLR0913", "PLR0915", "PLR2004", "PLW2901", "T201",
 ]
-
-
 fixable = ["ALL"]
-
 unfixable = []
 
 [tool.ruff.lint.mccabe]
 max-complexity = 12
 
 [tool.ruff.lint.isort]
-known-first-party = ["jarvis"]    # Using the actual project name
+known-first-party = ["jarvis"]
 force-sort-within-sections = true
 
-
-
 [tool.ruff.format]
-# Use double quotes, similar to Black and Google's recommendation.
 quote-style = "double"
-
-# Indent using spaces.
 indent-style = "space"
-
-# Skip magic trailing comma (Google style often omits it, Black adds it). Default is 'true'. Set to 'false' for Google style.
-skip-magic-trailing-comma = false # Set to true if you prefer Black's default
-
-# Use Ruff's preview formatting styles (recommended for latest improvements)
+skip-magic-trailing-comma = false
 preview = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["jarvis"]
 
+# UV configuration for custom dependency resolution and indexes
+[tool.uv]
+index-strategy = "first-index"  # Allowed values: first-index, unsafe-any-match, unsafe-first-match, unsafe-best-match
 
-[tool.uv.sources.pytorch]
+# Map PyTorch packages to our CUDA-enabled PyTorch index
+[tool.uv.sources]
+torch = { index = "pytorch" }
+torchvision = { index = "pytorch" }
+torchaudio = { index = "pytorch" }
+
+# Define indexes: our explicit PyTorch index for CUDA support and the default PyPI index
+[[tool.uv.index]]
+name = "pytorch"
 url = "https://download.pytorch.org/whl/cu126"
+explicit = true
 
 [[tool.uv.index]]
-url = "https://download.pytorch.org/whl/cu126"
+name = "pypi"
+url = "https://pypi.org/simple"

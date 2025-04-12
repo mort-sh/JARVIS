@@ -1,39 +1,33 @@
 #!/usr/bin/env python3
 """
-Quick keyboard-controlled voice transcription script using audio_handler.py
-This temporary script records voice while holding right-shift and automatically
+Quick keyboard-controlled voice transcription script using jarvis.audio.audio_handler
+This script records voice while holding right-shift and automatically
 types the transcription when the key is released.
-
-Also supports a test mode (--test) that records all keystrokes for 10 seconds.
 """
-# 
-import argparse
-from collections import defaultdict
 import os
-import queue
+import time
 import tempfile
 import threading
-import time
-
-import keyboard
-import numpy as np
+import queue
 import sounddevice as sd
 import soundfile as sf
-
-from audio_handler import TranscriptionMode, WhisperXModelSize, transcribe_audio
+import numpy as np
+import keyboard
+from typing import Optional, List
+from jarvis.audio.audio_handler import (
+    transcribe_audio,
+    TranscriptionMode,
+    WhisperXModelSize
+)
 
 # Configuration
 TEMP_DIR = tempfile.gettempdir()
 OUTPUT_FILENAME = os.path.join(TEMP_DIR, "voice_recording.wav")
-HOTKEY = "left windows"  # The key to hold for recording
+HOTKEY = "right shift"  # The key to hold for recording
 MODEL = TranscriptionMode.WHISPERX  # WHISPERX for local, OPENAI if you have API key
 MODEL_SIZE = WhisperXModelSize.BASE  # Smaller = faster, larger = more accurate
 SAMPLE_RATE = 16000
 CHANNELS = 1
-
-# torch.backends.cuda.matmul.allow_tf32 = True
-# torch.backends.cudnn.allow_tf32 = True
-
 
 class AudioRecorder:
     """Records audio only while a key is pressed"""
@@ -95,7 +89,7 @@ class AudioRecorder:
             print(f"Error stopping recording: {e}")
             return False
 
-def transcribe() -> str | None:
+def transcribe() -> Optional[str]:
     """Transcribe the recorded audio"""
     try:
         print("Transcribing...")
@@ -142,59 +136,7 @@ def type_text(text: str):
 
         time.sleep(delay)
 
-def run_test_mode():
-    """Records all keystrokes for 10 seconds and prints them live."""
-    print("Starting keystroke test mode...")
-    print("Recording all keystrokes for 10 seconds...")
-    print("Press any keys to test (output will appear live)...")
-    print("-" * 50)
-
-    # Dictionary to store keystroke counts
-    keystroke_counts = defaultdict(int)
-    start_time = time.time()
-
-    def on_key_event(event):
-        if event.event_type == "down":
-            key_name = event.name
-            keystroke_counts[key_name] += 1
-            elapsed = time.time() - start_time
-            remaining = max(0, int(10 - elapsed))
-            print(f"[{remaining}s] Key pressed: '{key_name}'")
-
-    # Start recording keystrokes
-    keyboard.hook(on_key_event)
-
-    try:
-        # Wait for 10 seconds
-        time.sleep(10)
-    finally:
-        keyboard.unhook_all()
-
-    print("\n" + "-" * 50)
-    print("\nTest completed! Keystroke summary:")
-    if not keystroke_counts:
-        print("No keystrokes recorded.")
-    else:
-        for key, count in sorted(keystroke_counts.items()):
-            print(f"Key '{key}': pressed {count} times")
-
-    print("\nExiting test mode.")
-
-
 def main():
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(
-        description="Voice transcription shortcut with optional test mode"
-    )
-    parser.add_argument(
-        "--test", action="store_true", help="Run in test mode: record keystrokes for 10 seconds"
-    )
-    args = parser.parse_args()
-
-    if args.test:
-        run_test_mode()
-        return
-
     print("Voice Transcription Shortcut")
     print(f"Hold {HOTKEY} to record, release to transcribe and type")
     print("Type 'exit' and press Enter in this terminal to quit")

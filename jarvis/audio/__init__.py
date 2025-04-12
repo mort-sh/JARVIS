@@ -6,6 +6,8 @@ Audio processing module for Jarvis.
 from .audio_handler import (
     TranscriptionMode,
     WhisperXModelSize,
+    AudioRecorder,
+    RecordingConfig,
     record_microphone,
     transcribe_audio,
     visualize_audio,

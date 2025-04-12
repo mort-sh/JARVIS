@@ -1,0 +1,7 @@
+Python executable: Z:\Coding\jarvis_v1\.venv\Scripts\python.exe
+Python version: 3.12.0 (main, Oct  2 2023, 23:53:49) [MSC v.1929 64 bit (AMD64)]
+PyTorch version: 2.6.0+cpu
+CUDA available: False
+CUDA version: N/A
+GPU devices: N/A
+GPU name: N/A

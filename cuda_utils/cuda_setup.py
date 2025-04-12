@@ -7,7 +7,7 @@ It can be used to reinstall PyTorch with CUDA support if needed.
 Requirements:
 - CUDA Toolkit installed (v12.6 recommended)
 - Compatible NVIDIA GPU drivers
-- UV package manager
+- pip package manager
 
 Process:
 1. Uninstall existing PyTorch packages
@@ -36,7 +36,7 @@ def setup_pytorch_cuda():
 
     # Uninstall existing PyTorch packages
     print("\n1. Uninstalling existing PyTorch packages...")
-    run_command(f"{sys.executable} -m uv pip uninstall -y torch torchvision torchaudio")
+    run_command(f"{sys.executable} -m pip uninstall -y torch torchvision torchaudio")
 
     # Install PyTorch with CUDA support
     print("\n2. Installing PyTorch with CUDA support...")
@@ -44,7 +44,7 @@ def setup_pytorch_cuda():
     index_url = f"https://download.pytorch.org/whl/{cuda_version}"
 
     # Install PyTorch packages with CUDA support
-    run_command(f"{sys.executable} -m uv pip install torch torchvision torchaudio --index-url {index_url}")
+    run_command(f"{sys.executable} -m pip install torch torchvision torchaudio --index-url {index_url}")
 
     # Verify CUDA is available
     print("\n3. Verifying CUDA is available...")

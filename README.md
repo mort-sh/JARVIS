@@ -26,19 +26,19 @@ A powerful desktop assistant that combines voice transcription, AI-powered comma
 - **Voice Commands**: Record and transcribe voice using OpenAI's Whisper model
   - Hold Right Shift to record, release to transcribe
   - Hold Ctrl + Right Shift to transcribe and auto-type the result
-  
+
 - **AI Command Processing**:
   - Code generation and refactoring with GPT models
   - Natural language queries with streaming responses
   - Code formatting and clipboard integration
-  
+
 - **Modern UI**:
   - Floating, translucent dialog that stays on top
   - Adjustable font size (+ and - keys)
   - Rich text formatting with syntax highlighting
   - Model selection dropdown
   - Conversation history with streaming updates
-  
+
 - **Keyboard Shortcuts**:
   - Right Shift: Start/stop voice recording
   - Ctrl + Right Shift: Record and auto-type
@@ -53,6 +53,7 @@ A powerful desktop assistant that combines voice transcription, AI-powered comma
 - Python 3.10 or higher
 - Git
 - A valid OpenAI API key
+- For GPU acceleration: NVIDIA GPU with CUDA 12.6 support (see [CUDA Setup Guide](docs/CUDA_SETUP.md))
 
 ### Installing UV Package Manager
 
@@ -62,7 +63,7 @@ UV is a high-performance Python package manager written in Rust that this projec
    ```bash
    # Windows (PowerShell)
    iwr -useb https://astral.sh/uv/install.ps1 | iex
-   
+
    # Unix/MacOS
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
@@ -204,13 +205,13 @@ The application is configured through `config/settings.py`:
 class Settings:
     # Client Configuration
     USE_OFFICIAL_OPENAI = False  # Toggle between UV and official client
-    
+
     # Model Defaults
     GLOBAL_DEFAULT_MODEL = "gpt-4o"  # Latest GPT-4 model
     GLOBAL_DEFAULT_AUDIO_MODEL = "whisper-1"
     GLOBAL_DEFAULT_IMAGE_MODEL = "dall-e-3"
     GLOBAL_DEFAULT_EMBEDDING_MODEL = "text-embedding-ada-002"
-    
+
     # API Configuration
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 ```
