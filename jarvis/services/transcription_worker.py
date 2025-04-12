@@ -25,7 +25,21 @@ from datetime import datetime
 
 from jarvis.ui.print_handler import advanced_console as console, RecordingState
 
-# Import audio_handler
+# Configure logging first
+log = logging.getLogger(__name__) # Get logger for this module
+
+# --- Debugging Import Paths ---
+import sys
+import importlib
+log.debug(f"Initial sys.path: {sys.path}")
+try:
+    import jarvis.audio
+    log.debug(f"Initial jarvis.audio location: {getattr(jarvis.audio, '__file__', 'N/A')}")
+except ImportError:
+    log.error("Could not import jarvis.audio initially")
+# --- End Debugging ---
+
+# Import audio_handler components (will be reloaded later)
 from jarvis.audio import (
     TranscriptionMode,
     WhisperXModelSize,
@@ -36,11 +50,9 @@ from jarvis.audio import (
     clear_transcription_cache
 )
 
-# Configure logging to only show errors
-logging.basicConfig(level=logging.ERROR)
-
-# Suppress specific loggers
-logging.getLogger("sounddevice").setLevel(logging.ERROR)
+# Basic config moved to main.py
+# Suppress specific loggers (already done by basicConfig force=True, but can keep for clarity)
+# logging.getLogger("sounddevice").setLevel(logging.ERROR)
 
 
 class TranscriptionWorker(QObject):
@@ -119,18 +131,72 @@ class TranscriptionWorker(QObject):
         """Start recording audio using the non-blocking stream."""
         if not self.recording:
             try:
+                # --- Force Reload and Check Module Path ---
+                log.debug("Attempting to force reload jarvis.audio.audio_handler")
+                try:
+                    import jarvis.audio.audio_handler
+                    importlib.reload(jarvis.audio.audio_handler)
+                    from jarvis.audio.audio_handler import AudioRecorder, RecordingConfig # Re-import directly
+                    log.debug(f"Reloaded AudioRecorder from: {getattr(AudioRecorder, '__module__', 'N/A')} - {getattr(sys.modules.get(AudioRecorder.__module__), '__file__', 'N/A')}")
+                    log.debug(f"Reloaded RecordingConfig from: {getattr(RecordingConfig, '__module__', 'N/A')} - {getattr(sys.modules.get(RecordingConfig.__module__), '__file__', 'N/A')}")
+
+                    # Check if we need to add our own non-blocking start method
+                    temp_recorder_check = AudioRecorder(RecordingConfig(output_filename='dummy.wav'))
+                    # Now check for the record method which should exist
+                    has_record = hasattr(temp_recorder_check, 'record')
+                    log.debug(f"Does reloaded AudioRecorder have 'record'? {has_record}")
+                    if not has_record:
+                         log.warning("Critical error: AudioRecorder is missing 'record' method!")
+                    del temp_recorder_check # Clean up dummy object
+
+                    # Monkey patch a start_stream method into AudioRecorder if needed
+                    if not hasattr(AudioRecorder, 'start_stream'):
+                        log.info("Adding non-blocking start_stream method to AudioRecorder")
+                        def start_stream(self):
+                            """Non-blocking version of record that just starts the stream."""
+                            log.info(f"Starting non-blocking recording (Device ID: {self._device_id if self._device_id is not None else 'Default'})...")
+                            try:
+                                # Import needed module directly inside method
+                                import sounddevice as sd
+                                self._stream = sd.InputStream(
+                                    samplerate=self.config.sample_rate,
+                                    channels=self.config.channels,
+                                    device=self._device_id,
+                                    callback=self._audio_callback
+                                )
+                                self._stream.start()
+                                return True
+                            except Exception as e:
+                                log.error(f"Error starting non-blocking stream: {e}")
+                                return False
+
+                        # Add the method to the class
+                        AudioRecorder.start_stream = start_stream
+
+                        # Also add stop_stream_and_save method for consistency
+                        def stop_stream_and_save(self):
+                            """Combined method to stop stream and save audio."""
+                            self._stop_stream()
+                            return self._save_audio()
+
+                        AudioRecorder.stop_stream_and_save = stop_stream_and_save
+
+                except Exception as reload_e:
+                    log.exception(f"Failed to reload jarvis.audio.audio_handler: {reload_e}")
+                    # Fallback to potentially stale imports if reload fails
+                    from jarvis.audio import AudioRecorder, RecordingConfig
+                # --- End Force Reload ---
+
                 self.temp_file_path = self._get_temp_filepath()
-                log_msg = f"[cyan]Starting recording to {self.temp_file_path}...[/cyan]"
-                console.log(log_msg)
+                log.debug(f"Starting recording to {self.temp_file_path}")
 
                 # Ensure AudioRecorder is initialized with the correct config
-                # We create a new instance each time to ensure clean state and correct filename
                 recording_config = RecordingConfig(
-                    output_filename=str(self.temp_file_path), # Pass as string
-                    # Add other config options like sample_rate, device_name if needed
-                    visual=False # Visual mode uses blocking prompt
+                    output_filename=str(self.temp_file_path),
+                    visual=False
                 )
                 self.audio_recorder = AudioRecorder(recording_config)
+                log.debug(f"AudioRecorder instance created: {self.audio_recorder}")
 
                 # Set recording state *before* starting stream
                 self.recording = True
@@ -139,13 +205,38 @@ class TranscriptionWorker(QObject):
                 self.recording_state.update(is_recording=True, transcribing=False)
                 self.update_recording_state()
 
-                # Start the non-blocking stream
-                self.audio_recorder.start_stream()
+                # --- Debugging: Print attributes of the recorder object ---
+                try:
+                    log.debug(f"Attributes of self.audio_recorder: {dir(self.audio_recorder)}")
+                except Exception as inspect_e:
+                    log.error(f"Could not inspect self.audio_recorder attributes: {inspect_e}")
+                # --- End Debugging ---
 
+                # Start the non-blocking stream
+                # Prefer our patched start_stream method if added, fall back to record() if needed
+                if hasattr(self.audio_recorder, 'start_stream'):
+                    success = self.audio_recorder.start_stream()
+                    if not success:
+                        raise RuntimeError("Failed to start audio stream")
+                else:
+                    # Last resort - use the blocking record method in a thread (not ideal)
+                    log.warning("Using fallback blocking record() method in a thread - this is not ideal")
+                    import threading
+                    self.record_thread = threading.Thread(target=self.audio_recorder.record)
+                    self.record_thread.daemon = True
+                    self.record_thread.start()
+
+            except AttributeError as ae:
+                 # Log the specific attribute error in more detail
+                 log.exception(f"AttributeError during start_recording: {ae}")
+                 self.recording = False
+                 self.audio_recorder = None
+                 self.recording_state.update(is_recording=False, transcribing=False)
             except Exception as e:
-                console.log(f"[red]Failed to start recording: {e}[/red]")
+                # Log other exceptions
+                log.exception(f"Failed to start recording: {e}") # Use log.exception for stack trace
                 self.recording = False
-                self.audio_recorder = None # Clear recorder on error
+                self.audio_recorder = None
                 self.recording_state.update(is_recording=False, transcribing=False)
 
     def stop_recording(self) -> None:
@@ -153,7 +244,7 @@ class TranscriptionWorker(QObject):
         if self.recording:
             self.recording = False # Set state immediately
             duration = time.time() - self.start_time
-            console.log(f"[cyan]Stopping recording. Duration: {duration:.2f}s[/cyan]")
+            log.debug(f"Stopping recording. Duration: {duration:.2f}s")
 
             # Update recording state (show not recording, but maybe transcribing soon)
             self.recording_state.update(is_recording=False)
@@ -164,7 +255,11 @@ class TranscriptionWorker(QObject):
                  return
 
             # Stop the stream and save the file
-            saved_filename = self.audio_recorder.stop_stream_and_save()
+            if hasattr(self.audio_recorder, 'stop_stream_and_save'):
+                saved_filename = self.audio_recorder.stop_stream_and_save()
+            else:
+                self.audio_recorder._stop_stream()
+                saved_filename = self.audio_recorder._save_audio()
             self.audio_recorder = None # Clear recorder instance after stopping
 
             if saved_filename and duration > 0.5:
@@ -213,7 +308,7 @@ class TranscriptionWorker(QObject):
         """Transcribe audio file using audio_handler."""
         try:
             # UI state is already set to transcribing in stop_recording
-            console.log(f"[blue]Transcribing audio from {filename}...[/blue]")
+            log.debug(f"Transcribing audio from {filename}")
 
             # Perform transcription
             transcription = transcribe_audio(
@@ -236,14 +331,14 @@ class TranscriptionWorker(QObject):
             self.update_recording_state()
 
             if transcription:
-                console.log(f"[green]Transcription successful.[/green]") # Don't log the full text here
+                log.debug("Transcription successful.") # Don't log the full text here
             else:
-                 console.log("[yellow]Transcription returned empty.[/yellow]")
+                 log.debug("Transcription returned empty.")
 
             return transcription or "" # Return empty string if None
 
         except Exception as e:
-            console.log(f"[red bold]Transcription failed: {e}[/red bold]")
+            log.error(f"Transcription failed: {e}")
 
             # Clean up temp file even on error
             try:
@@ -308,31 +403,85 @@ class TranscriptionWorker(QObject):
         console.live_render(self.get_status_panel())
 
     def run_keyboard_hook(self) -> None:
+        log.debug("run_keyboard_hook called")
         def on_right_shift_press(e):
             # Check if ctrl is pressed when right shift is pressed
             ctrl_pressed = keyboard.is_pressed('ctrl')
-            self.start_recording(with_ctrl=ctrl_pressed)
+            log.debug(f"Right shift pressed. Event: {e}, Ctrl pressed: {ctrl_pressed}")
+            # Add check to ensure not already recording to prevent multiple starts
+            if not self.recording:
+                 self.start_recording(with_ctrl=ctrl_pressed)
+            else:
+                 log.warning("Right shift pressed, but already recording. Ignoring.")
 
         def on_right_shift_release(e):
-            self.stop_recording()
+            log.debug(f"Right shift released. Event: {e}")
+            # Only stop if we are currently recording
+            if self.recording:
+                 self.stop_recording()
+            else:
+                 log.warning("Right shift released, but was not recording. Ignoring.")
 
         # Register both hotkey combinations
-        keyboard.on_press_key("right shift", on_right_shift_press)
-        keyboard.on_release_key("right shift", on_right_shift_release)
+        try:
+            log.info("Registering keyboard hooks for right shift...")
+            # Using on_press_key and on_release_key for potentially better compatibility
+            keyboard.on_press_key("right shift", on_right_shift_press, suppress=False)
+            keyboard.on_release_key("right shift", on_right_shift_release, suppress=False)
+            # Consider adding trigger_on_release=False if on_press_key doesn't work as expected
 
-        # Display registered hotkeys and start live status display
-        self.print_registered_hotkeys()
+            log.info("Keyboard hooks registered.")
 
-        # Main update loop
-        while self._running:
-            if self.recording or self.recording_state.transcribing:
-                self.update_recording_state()
-                console.live_render(self.get_status_panel())
-            time.sleep(0.1)  # Update every 100ms
+            # Display registered hotkeys and start live status display
+            self.print_registered_hotkeys()
+
+            # Main update loop with better responsiveness to stop requests
+            log.debug("Starting keyboard hook update loop...")
+            while self._running:
+                # Check if recording or transcribing to update the UI
+                if self.recording or self.recording_state.transcribing:
+                    self.update_recording_state()
+                    console.live_render(self.get_status_panel())
+
+                # Smaller sleep interval for more responsive shutdown
+                for _ in range(5):  # Check stop flag 5 times within 50ms
+                    if not self._running:
+                        break
+                    time.sleep(0.01)  # 10ms * 5 = 50ms total
+
+            log.debug("Keyboard hook update loop finished.")
+
+        except ImportError:
+             log.error("The 'keyboard' library is not installed. Hotkeys disabled.")
+             log.error("Please install it using: uv pip install keyboard")
+        except Exception as e:
+             log.exception(f"An error occurred setting up or running keyboard hooks: {e}")
+        finally:
+             # Ensure hooks are removed when the loop exits or on error
+             log.info("Unhooking all keyboard listeners.")
+             try:
+                 keyboard.unhook_all()
+             except Exception as e:
+                 log.error(f"Error unhooking keyboard listeners: {e}")
 
     def stop(self) -> None:
         """Stop the worker and clean up resources."""
+        log.info("Stopping TranscriptionWorker...")
+
+        # Set the running flag to false to stop the main loop
         self._running = False
-        console.stop_live()
-        keyboard.unhook_all()
-        clear_transcription_cache()  # Clean up audio_handler models
+
+        # If currently recording, stop it
+        if self.recording:
+            try:
+                self.stop_recording()
+            except Exception as e:
+                log.error(f"Error stopping recording during shutdown: {e}")
+
+        # Handle cleanup for console and resources
+        try:
+            console.stop_live()
+        except Exception as e:
+            log.error(f"Error stopping console live display: {e}")
+
+        log.info("TranscriptionWorker stopped.")

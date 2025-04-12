@@ -106,3 +106,8 @@ explicit = true
 [[tool.uv.index]]
 name = "pypi"
 url = "https://pypi.org/simple"
+
+[dependency-groups]
+dev = [
+    "toml>=0.10.2",
+]
