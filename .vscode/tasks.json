@@ -1,0 +1,69 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Clean Project",
+            "type": "shell",
+            "command": "uv run scripts\\clean.py",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            }
+        },
+        {
+            "label": "Build Project",
+            "type": "shell",
+            "command": "uv run scripts\\build.py",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            }
+        },
+        {
+            "label": "AutoCommit",
+            "type": "shell",
+            "command": "autocommit.exe",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            // "presentation": {
+            //     "reveal": "silent",
+            //     "focus": false,
+            //     "panel": "shared",
+            //     "showReuseMessage": false,
+            //     "clear": false
+            // }
+        },
+        {
+            "label": "Run Project",
+            "type": "shell",
+            "command": "uv run scripts\\run.py",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Run Tests",
+            "type": "shell",
+            "command": "uv run scripts\\test.py",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        }
+    ]
+}
