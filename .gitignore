@@ -8,7 +8,6 @@ my_app.egg-info
 *.lock
 .DS_Store
 .idea
-.vscode
 .pytest_cache
 .coverage
 .mypy_cache
