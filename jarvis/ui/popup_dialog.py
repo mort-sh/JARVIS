@@ -3,22 +3,20 @@ A customizable popup dialog for displaying conversation history.
 """
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QPainter, QColor, QTextCursor, QAction
+from PyQt6.QtGui import QColor, QFont, QPainter, QTextCursor
 from PyQt6.QtWidgets import (
+    QApplication,
+    QComboBox,
     QDialog,
-    QTextEdit,
-    QVBoxLayout,
     QHBoxLayout,
     QPushButton,
-    QLabel,
-    QComboBox,
-    QApplication,
+    QTextEdit,
+    QVBoxLayout,
 )
-from jarvis.ui.print_handler import advanced_console as console
-from datetime import datetime
 from rich.console import Console
-from rich.panel import Panel
-from rich import box
+
+from jarvis.ui.print_handler import advanced_console as console
+
 console = Console()
 
 from jarvis.ui.interfaces import IUIController
@@ -28,7 +26,7 @@ class PopupDialog(QDialog):
     def __init__(self, controller: IUIController, parent=None) -> None:
         """
         Initialize the popup dialog.
-        
+
         Args:
             controller: The UI controller that handles business logic
             parent: The parent widget
@@ -38,31 +36,29 @@ class PopupDialog(QDialog):
         self.conversation_history = []  # List of tuples (sender, message)
         self.oldPos = None
         self.initUI()
-        
+
         # Connect controller signals
-        if hasattr(self.controller, 'update_assistant_message'):
+        if hasattr(self.controller, "update_assistant_message"):
             self.controller.update_assistant_message.connect(
                 lambda text: self.append_message(text, sender="Assistant")
             )
-        
-        if hasattr(self.controller, 'stream_assistant_chunk'):
-            self.controller.stream_assistant_chunk.connect(
-                self.stream_assistant_update
-            )
-            
-        if hasattr(self.controller, 'clear_assistant_message'):
-            self.controller.clear_assistant_message.connect(
-                self.handle_clear
-            )
-            
-        if hasattr(self.controller, 'transcription_result'):
-            self.controller.transcription_result.connect(
-                self.custom_update
-            )
+
+        if hasattr(self.controller, "stream_assistant_chunk"):
+            self.controller.stream_assistant_chunk.connect(self.stream_assistant_update)
+
+        if hasattr(self.controller, "clear_assistant_message"):
+            self.controller.clear_assistant_message.connect(self.handle_clear)
+
+        if hasattr(self.controller, "transcription_result"):
+            self.controller.transcription_result.connect(self.custom_update)
 
     def initUI(self) -> None:
         # Frameless and translucent
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog | Qt.WindowType.WindowStaysOnTopHint)
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.Dialog
+            | Qt.WindowType.WindowStaysOnTopHint
+        )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
         self.resize(1000, 700)
@@ -116,7 +112,7 @@ class PopupDialog(QDialog):
         button_layout.addStretch()
         button_layout.addWidget(close_button)
         layout.addLayout(button_layout)
-        
+
         self.model_combo = QComboBox(self)
         self.model_combo.setMinimumWidth(300)
         self.model_combo.setStyleSheet(
@@ -135,14 +131,14 @@ class PopupDialog(QDialog):
             }
             """
         )
-        
+
         # Get models from controller
         model_ids = self.controller.get_model_list()
         self.model_combo.addItems(model_ids)
         self.current_model = model_ids[0]
         self.model_combo.setCurrentIndex(0)
         self.model_combo.currentTextChanged.connect(self.on_model_changed)
-    
+
         self.text_edit = QTextEdit(self)
         self.text_edit.setAcceptRichText(True)
         self.text_edit.setAutoFormatting(QTextEdit.AutoFormattingFlag.AutoAll)
@@ -209,7 +205,7 @@ class PopupDialog(QDialog):
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setBrush(QColor(27, 27, 27, 235))
         painter.setPen(QColor("#00dd00"))
         painter.drawRoundedRect(self.rect(), 15, 15)
@@ -264,16 +260,16 @@ class PopupDialog(QDialog):
     def custom_update(self, text: str) -> None:
         """
         Handle user input and generate a response.
-        
+
         Args:
             text: The user's input text
         """
         # Append the user's message
         self.append_message(text, sender="User")
-        
+
         # Delegate processing to the controller
         self.controller.process_user_input(text)
-        
+
         if not self.isVisible():
             self.show()
         self.activateWindow()
@@ -286,7 +282,7 @@ class PopupDialog(QDialog):
     def append_message(self, message: str, sender: str = "Assistant") -> None:
         """
         Add a message to the conversation and refresh the display.
-        
+
         Args:
             message: The message text
             sender: The sender name
@@ -298,7 +294,7 @@ class PopupDialog(QDialog):
     def stream_assistant_update(self, partial_content: str) -> None:
         """
         Update the latest assistant message with streaming content.
-        
+
         Args:
             partial_content: The partial message content
         """

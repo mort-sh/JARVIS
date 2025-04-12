@@ -37,12 +37,11 @@ Features & Wrappers Implemented:
 import datetime
 import json
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
-from rich import box
-from rich.align import Align
+from rich import box, traceback
 from rich.columns import Columns
-from rich.console import Console, ConsoleOptions, Group, RenderableType
+from rich.console import Console, Group, RenderableType
 from rich.layout import Layout
 from rich.live import Live
 from rich.logging import RichHandler
@@ -50,16 +49,15 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.pretty import Pretty
 from rich.progress import (
+    BarColumn,
     Progress,
     SpinnerColumn,
     TextColumn,
-    BarColumn,
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
 from rich.prompt import Prompt
 from rich.rule import Rule
-from rich.spinner import Spinner
 from rich.status import Status
 from rich.style import Style
 from rich.syntax import Syntax
@@ -67,7 +65,8 @@ from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
 from rich.tree import Tree
-from rich import traceback
+
+from jarvis.state import RecordingState
 
 # Enable Rich's nicer traceback by default
 traceback.install()
@@ -82,7 +81,7 @@ class ThemePreset:
     Allows consistent styling across all output.
     """
 
-    def __init__(self, name: str = "default", styles: Optional[Dict[str, Style]] = None):
+    def __init__(self, name: str = "default", styles: dict[str, Style] | None = None):
         self.name = name
         self.styles = styles or {
             "info": Style(color="cyan"),
@@ -158,8 +157,8 @@ class BaseState:
         self,
         identifier: str,
         source_name: str,
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ):
         self.identifier = identifier
         self.source_name = source_name
@@ -188,8 +187,8 @@ class ContentState(BaseState):
         source_name: str,
         content: str,
         format_type: str = "markdown",
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ):
         super().__init__(identifier, source_name, tags, metadata)
         self.content = content
@@ -224,14 +223,14 @@ class ActionState(BaseState):
         identifier: str,
         source_name: str,
         name: str,
-        args: Dict[str, Any],
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        args: dict[str, Any],
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ):
         super().__init__(identifier, source_name, tags, metadata)
         self.name = name
         self.args = args
-        self.result: Optional[str] = None
+        self.result: str | None = None
         self.is_error: bool = False
         self.is_complete: bool = False
         self.progress: float = 0.0
@@ -247,9 +246,7 @@ class ActionState(BaseState):
                 TimeElapsedColumn(),
                 TimeRemainingColumn(),
             )
-            task_id = progress.add_task(
-                f"{self.name.title()}", total=100.0, start=False
-            )
+            task_id = progress.add_task(f"{self.name.title()}", total=100.0, start=False)
             progress.update(task_id, completed=self.progress * 100, start=True)
             return Panel(
                 progress,
@@ -289,8 +286,8 @@ class DataState(BaseState):
         source_name: str,
         data: Any,
         render_mode: str = "auto",
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ):
         super().__init__(identifier, source_name, tags, metadata)
         self.data = data
@@ -341,46 +338,32 @@ class DataState(BaseState):
         )
 
 
-class RecordingState(BaseState):
+class RecordingStateRenderer:
     """
-    State for displaying audio recording status with live updates.
-    Includes recording status, duration, and volume meter.
+    Renderer for displaying RecordingState in the UI.
+    Handles the visual representation of recording status.
     """
 
-    def __init__(self):
-        super().__init__("recording", "Audio Recording")
-        self.is_recording = False
-        self.duration = 0.0
-        self.volume_level = 0.0
-        self.transcribing = False
-        
-    def update(self, is_recording: bool, duration: float = 0.0, volume_level: float = 0.0, transcribing: bool = False):
-        """Update the recording state with new values."""
-        self.is_recording = is_recording
-        self.duration = duration
-        self.volume_level = min(max(volume_level, 0.0), 1.0)  # Clamp between 0 and 1
-        self.transcribing = transcribing
-        self.first_timestamp = datetime.datetime.now()  # Update timestamp
-
-    def render(self) -> RenderableType:
+    @staticmethod
+    def render(state: RecordingState) -> RenderableType:
+        """Render a RecordingState instance as a Rich Panel."""
         # Create status section
-        status_icon = "🔴" if self.is_recording else "⚪"
-        status_text = "Recording" if self.is_recording else "Ready"
-        if self.transcribing:
+        status_icon = "🔴" if state.is_recording else "⚪"
+        status_text = "Recording" if state.is_recording else "Ready"
+        if state.transcribing:
             status_text = "Transcribing..."
             status_icon = "💭"
-            
+
         status = Text.assemble(
             (f"{status_icon} ", "bold"),
-            (status_text, "bold red" if self.is_recording else "bold grey")
+            (status_text, "bold red" if state.is_recording else "bold grey"),
         )
-        
+
         # Create duration counter
         duration_text = Text.assemble(
-            ("Duration: ", "dim"),
-            (f"{self.duration:.1f}s", "bold cyan")
+            ("Duration: ", "dim"), (f"{state.duration:.1f}s", "bold cyan")
         )
-        
+
         # Create volume meter using progress bar
         progress = Progress(
             SpinnerColumn(style="cyan"),
@@ -389,11 +372,11 @@ class RecordingState(BaseState):
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             expand=True,
         )
-        
+
         # Add the volume task
         task_id = progress.add_task("Volume", total=100.0)
-        progress.update(task_id, completed=self.volume_level * 100)
-        
+        progress.update(task_id, completed=state.volume_level * 100)
+
         # Combine all elements
         content = Group(
             status,
@@ -402,14 +385,15 @@ class RecordingState(BaseState):
             Text(),  # Empty line
             progress,
         )
-        
+
         return Panel(
             content,
             title="[bold]Recording Status[/]",
-            border_style="red" if self.is_recording else "blue",
-            box=box.HEAVY if self.is_recording else box.ROUNDED,
+            border_style="red" if state.is_recording else "blue",
+            box=box.HEAVY if state.is_recording else box.ROUNDED,
             padding=(1, 2),
         )
+
 
 # --------------------------------------------------------------------------
 # ADVANCED CONSOLE CLASS WITH WRAPPERS
@@ -423,7 +407,7 @@ class AdvancedConsole:
 
     def __init__(
         self,
-        theme: Optional[ThemePreset] = None,
+        theme: ThemePreset | None = None,
         auto_live_refresh: bool = True,
         log_level: int = logging.ERROR,
     ):
@@ -449,14 +433,14 @@ class AdvancedConsole:
         self.logger = logging.getLogger("AdvancedConsole")
 
         # Optional live-updating
-        self.live: Optional[Live] = None
+        self.live: Live | None = None
         self.auto_live_refresh = auto_live_refresh
 
         # A LayoutManager for advanced usage
         self.layout_manager = LayoutManager(self.console)
 
         # Store states (optional usage)
-        self.states: Dict[str, BaseState] = {}
+        self.states: dict[str, BaseState] = {}
 
     # ------------------------------
     # Live management
@@ -473,7 +457,7 @@ class AdvancedConsole:
         if self.live and self.live.is_started:
             self.live.stop()
 
-    def update_live(self, renderable: Optional[RenderableType] = None) -> None:
+    def update_live(self, renderable: RenderableType | None = None) -> None:
         """Update the live display with a new renderable or layout."""
         if not self.live or not self.live.is_started:
             return
@@ -492,22 +476,22 @@ class AdvancedConsole:
         *objects: Any,
         sep: str = " ",
         end: str = "\n",
-        style: Union[str, Style, None] = None,
-        justify: Optional[str] = None,
-        overflow: Optional[str] = None,
-        no_wrap: Optional[bool] = None,
-        emoji: Optional[bool] = None,
-        markup: Optional[bool] = True,
-        highlight: Optional[bool] = False,
-        width: Optional[int] = None,
+        style: str | Style | None = None,
+        justify: str | None = None,
+        overflow: str | None = None,
+        no_wrap: bool | None = None,
+        emoji: bool | None = None,
+        markup: bool | None = True,
+        highlight: bool | None = False,
+        width: int | None = None,
         crop: bool = True,
-        soft_wrap: Optional[bool] = None,
+        soft_wrap: bool | None = None,
         new_line_start: bool = False,
     ) -> None:
         """
         An enhanced drop-in replacement for Python's built-in print.
         Supports markup, styling, auto-highlighting, and additional formatting options.
-        
+
         Args:
             objects (positional args): Objects to log to the terminal.
             sep (str, optional): String to write between print data. Defaults to " ".
@@ -564,7 +548,9 @@ class AdvancedConsole:
         word_wrap: bool = True,
     ) -> None:
         """Render syntax-highlighted code."""
-        syntax = Syntax(code, lexer_name, theme=theme, line_numbers=line_numbers, word_wrap=word_wrap)
+        syntax = Syntax(
+            code, lexer_name, theme=theme, line_numbers=line_numbers, word_wrap=word_wrap
+        )
         self.print(syntax)
 
     # ------------------------------
@@ -577,7 +563,9 @@ class AdvancedConsole:
     # ------------------------------
     # Inspect
     # ------------------------------
-    def inspect_object(self, obj: Any, methods: bool = True, private: bool = False, dunder: bool = False) -> None:
+    def inspect_object(
+        self, obj: Any, methods: bool = True, private: bool = False, dunder: bool = False
+    ) -> None:
         """
         Display an object's attributes, optionally including methods, private, or dunder attributes.
         """
@@ -593,7 +581,7 @@ class AdvancedConsole:
     # ------------------------------
     # Traceback Rendering
     # ------------------------------
-    def install_traceback(self, show_locals: bool = True, width: Optional[int] = None) -> None:
+    def install_traceback(self, show_locals: bool = True, width: int | None = None) -> None:
         """
         Install Rich-based traceback handler globally.
         Optionally show locals and set a maximum width.
@@ -609,7 +597,7 @@ class AdvancedConsole:
     # ------------------------------
     def print_table(
         self,
-        data: List[Dict[str, Any]],
+        data: list[dict[str, Any]],
         title: str = "Data Table",
         columns_style: str = "data",
     ) -> None:
@@ -636,7 +624,7 @@ class AdvancedConsole:
     # ------------------------------
     def track_progress(
         self,
-        tasks: Dict[str, float],
+        tasks: dict[str, float],
         description: str = "Processing",
         transient: bool = False,
     ) -> None:
@@ -655,7 +643,7 @@ class AdvancedConsole:
             console=self.console,
         ) as progress:
             task_map = {}
-            for name in tasks.keys():
+            for name in tasks:
                 task_map[name] = progress.add_task(f"{description}: {name}", total=100.0)
 
             # Simulate updating progress
@@ -678,7 +666,7 @@ class AdvancedConsole:
     # ------------------------------
     # Tree
     # ------------------------------
-    def print_tree(self, data: Dict[str, Any], title: str = "Tree") -> None:
+    def print_tree(self, data: dict[str, Any], title: str = "Tree") -> None:
         """
         Render hierarchical dictionary data as a tree structure.
         """
@@ -702,7 +690,7 @@ class AdvancedConsole:
     # ------------------------------
     # Columns
     # ------------------------------
-    def print_columns(self, items: List[str], width: Optional[int] = None) -> None:
+    def print_columns(self, items: list[str], width: int | None = None) -> None:
         """
         Arrange multiple items in balanced columns.
         """
@@ -822,6 +810,7 @@ class AdvancedConsole:
         then revert back to main screen.
         """
         import time
+
         with self.console.screen():
             self.print(renderable)
             time.sleep(delay)
@@ -829,10 +818,10 @@ class AdvancedConsole:
     # ------------------------------
     # Overflow Control
     # ------------------------------
-    def safe_print(self, text_str: str, max_width: Optional[int] = None) -> None:
+    def safe_print(self, text_str: str, max_width: int | None = None) -> None:
         """
         Print text, wrapping or truncating if it exceeds the given max_width.
-        If max_width is None, uses console width. 
+        If max_width is None, uses console width.
         """
         terminal_width = max_width or self.console.width
         wrapped = Text(text_str).wrap(terminal_width, expand=False)
@@ -878,6 +867,7 @@ class AdvancedConsole:
         Render long text with a pager so users can scroll comfortably.
         """
         from rich.pager import Pager
+
         Pager(self.console, content)
 
     # ------------------------------
@@ -897,7 +887,7 @@ class AdvancedConsole:
         self.states[identifier] = state
         self.refresh_states()
 
-    def get_state(self, identifier: str) -> Optional[BaseState]:
+    def get_state(self, identifier: str) -> BaseState | None:
         """Retrieve a previously stored state."""
         return self.states.get(identifier)
 

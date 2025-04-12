@@ -3,49 +3,58 @@
 Main entry point for the application.
 """
 
-import sys
-import threading
 import argparse
 import logging
 import signal
-import os
+import sys
+import threading
+import warnings
+
+# Attempt to import the specific warning category
+try:
+    from pyannote.audio.utils.reproducibility import ReproducibilityWarning
+except ImportError:
+    # Fallback if the import path changes or is unavailable
+    ReproducibilityWarning = Warning  # Use base Warning class as fallback
+
+# Suppress specific warnings by message content
+warnings.filterwarnings("ignore", message="Model was trained with pyannote.audio 0.0.1")
+warnings.filterwarnings("ignore", message="Model was trained with torch 1.10.0+cu102")
+
+# Suppress the ReproducibilityWarning by category
+warnings.filterwarnings("ignore", category=ReproducibilityWarning)
 
 import keyboard
-from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QTimer
-from rich.console import Console
-from rich.panel import Panel
-from rich import box
-from datetime import datetime
-from jarvis.ui.print_handler import advanced_console as console
-console = Console()
+from PyQt6.QtWidgets import QApplication
 
-from jarvis.ui.popup_dialog import PopupDialog
+# console = Console()
 from jarvis.ui.controller import UIController
+from jarvis.ui.popup_dialog import PopupDialog
+from jarvis.ui.print_handler import advanced_console as console
 
 
 def main() -> None:
     # --- Argument Parsing ---
     parser = argparse.ArgumentParser(description="Run Jarvis UI")
     parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable debug logging for detailed output."
+        "--debug", action="store_true", help="Enable debug logging for detailed output."
     )
     args = parser.parse_args()
 
     # --- Configure Logging ---
-    log_level = logging.DEBUG if args.debug else logging.INFO
+    # Default to ERROR, enable DEBUG (and INFO) only if --debug is passed
+    log_level = logging.DEBUG if args.debug else logging.ERROR
     # Configure root logger - this might affect libraries as well
     logging.basicConfig(
         level=log_level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        force=True # Override any existing basicConfig by libraries
+        force=True,  # Override any existing basicConfig by libraries
     )
     # Optionally, set specific loggers to different levels if needed
     # logging.getLogger("jarvis").setLevel(log_level) # Example
     # logging.getLogger("keyboard").setLevel(log_level) # Might reveal keyboard lib issues
-    log = logging.getLogger(__name__) # Get logger for main module
+    log = logging.getLogger(__name__)  # Get logger for main module
     log.info(f"Logging level set to: {logging.getLevelName(log_level)}")
 
     # --- Application Setup ---
