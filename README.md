@@ -1,10 +1,12 @@
-# JARVIS: An AI-Powered Desktop Assistant
+<span align="center">
 
-<p align="center">
+# JARVIS
+
   <img src="logo.png" alt="JARVIS Logo" height="400" style="display: block; margin: auto;">
-</p>
 
 JARVIS is a powerful desktop assistant that combines voice transcription, AI-powered command processing, and a modern PyQt6-based UI. The application provides seamless integration with OpenAI's APIs for transcription, code generation, and conversational AI, all accessible through an elegant floating interface.
+
+</span>
 
 ## Features
 
