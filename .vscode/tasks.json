@@ -41,13 +41,6 @@
                 "cwd": "${workspaceFolder}"
             },
             "problemMatcher": [],
-            // "presentation": {
-            //     "reveal": "silent",
-            //     "focus": false,
-            //     "panel": "shared",
-            //     "showReuseMessage": false,
-            //     "clear": false
-            // }
         },
         {
             "label": "Run Project",
