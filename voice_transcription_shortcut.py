@@ -25,7 +25,7 @@ from audio_handler import TranscriptionMode, WhisperXModelSize, transcribe_audio
 # Configuration
 TEMP_DIR = tempfile.gettempdir()
 OUTPUT_FILENAME = os.path.join(TEMP_DIR, "voice_recording.wav")
-HOTKEY = "left windows"  # The key to hold for recording
+HOTKEY = "right shift"  # The key to hold for recording
 MODEL = TranscriptionMode.WHISPERX  # WHISPERX for local, OPENAI if you have API key
 MODEL_SIZE = WhisperXModelSize.BASE  # Smaller = faster, larger = more accurate
 SAMPLE_RATE = 16000

@@ -2,8 +2,8 @@
 Handles keyboard hooking, audio recording, transcription, and simulated typing.
 
 Hotkey functionality:
-- Right Shift: Record audio and emit transcription for command processing
-- Control + Right Shift: Record audio and simulate typing (bypass commands)
+- Right Shift: Record audio and simulate typing (bypass commands)
+- Control + Right Shift: Record audio and emit transcription for command processing
 """
 
 from datetime import datetime
@@ -41,11 +41,11 @@ class TranscriptionWorker(QObject):
     # Centralized hotkey configuration
     HOTKEY_DEFINITIONS: dict[str, dict[str, any]] = {
         "right shift": {
-            "description": "Record and emit transcription for command processing",
+            "description": "Record and simulate typing (bypass commands)",
             "requires_ctrl": False,
         },
         "ctrl+right shift": {
-            "description": "Record and simulate typing (bypass commands)",
+            "description": "Record and emit transcription for command processing",
             "requires_ctrl": True,
         },
     }
@@ -253,16 +253,16 @@ class TranscriptionWorker(QObject):
     def handle_transcription_result(self, transcription: str):
         """Process the transcription based on whether Ctrl was pressed."""
         if self.ctrl_pressed:
+            log.info(f"Emitting transcription for processing: '{transcription}'")
+            console.log(f"[green]Emitting transcription for processing: '{transcription}'[/green]")
+            self.transcriptionReady.emit(transcription)
+        else:
             log.info(f"Simulating typing transcription: '{transcription}'")
             console.log(f"[magenta]Simulating typing: '{transcription}'[/magenta]")
             try:
                 keyboard.write(transcription, delay=0.01)
             except Exception as e:
                 log.exception(f"Error simulating typing: {e}")
-        else:
-            log.info(f"Emitting transcription for processing: '{transcription}'")
-            console.log(f"[green]Emitting transcription for processing: '{transcription}'[/green]")
-            self.transcriptionReady.emit(transcription)
 
         # The logic above correctly handles emitting to the UI (via transcriptionReady)
         # or typing directly based on ctrl_pressed. No further emission needed here.
