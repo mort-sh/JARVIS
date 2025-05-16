@@ -17,7 +17,6 @@ dependencies = [
     "requests>=2.32.3",
     "sounddevice>=0.5.1",
     "soundfile>=0.13.1",
-    "vosk>=0.3.45",
     "wave>=0.0.2",
     "torch>=2.6.0",
     "torchvision>=0.21.0",
@@ -92,10 +91,10 @@ packages = ["jarvis"]
 index-strategy = "first-index"  # Allowed values: first-index, unsafe-any-match, unsafe-first-match, unsafe-best-match
 
 # Map PyTorch packages to our CUDA-enabled PyTorch index
-[tool.uv.sources]
-torch = { index = "pytorch" }
-torchvision = { index = "pytorch" }
-torchaudio = { index = "pytorch" }
+# [tool.uv.sources]
+# torch = { index = "pytorch" }
+# torchvision = { index = "pytorch" }
+# torchaudio = { index = "pytorch" }
 
 # Define indexes: our explicit PyTorch index for CUDA support and the default PyPI index
 [[tool.uv.index]]
