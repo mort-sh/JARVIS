@@ -42,19 +42,11 @@ except ImportError:
         "PyTorch or WhisperX library not found. WhisperX transcription mode will be unavailable."
     )
 
-try:
-    from vosk import Model as VoskModel, KaldiRecognizer
-except ImportError:
-    VoskModel = None
-    KaldiRecognizer = None
-    log.debug("Vosk library not found. Vosk transcription mode will be unavailable.")
-
 
 # --- Enums ---
 class TranscriptionMode(Enum):
     OPENAI = auto()
     WHISPERX = auto()
-    VOSK = auto()
 
 
 class WhisperXModelSize(Enum):
@@ -74,26 +66,12 @@ class ComputeType(Enum):
     # Add other types if needed, e.g., FLOAT32
 
 
-class VoskModelType(Enum):
-    # Format: (model_name, download_url, expected_folder_name)
-    # URLs from https://alphacephei.com/vosk/models
-    SMALL_EN_US = (
-        "small-en-us",
-        "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip",
-        "vosk-model-small-en-us-0.15",
-    )
-    # Add more models as needed, e.g.:
-    # MEDIUM_EN_US = ("medium-en-us", "URL_HERE", "vosk-model-en-us-0.22")
-    # LARGE_EN_US = ("large-en-us", "URL_HERE", "vosk-model-en-us-0.42-gigaspeech")
-
-
 # --- Constants ---
 DEFAULT_SAMPLE_RATE = 16000
 DEFAULT_CHANNELS = 1
 VISUALIZER_WIDTH = 20
 VISUALIZER_THRESHOLD = 0.05
 REFRESH_INTERVAL = 0.1
-DEFAULT_VOSK_CACHE_DIR = Path.home() / ".cache" / "aider_voice_utils" / "vosk_models"
 
 
 # --- Configuration Dataclasses ---
@@ -117,12 +95,6 @@ class OpenAITranscriptionConfig:
 class WhisperXTranscriptionConfig:
     model_size: WhisperXModelSize = WhisperXModelSize.BASE
     language: Optional[str] = None  # Specify language code (e.g., "en")
-
-
-@dataclass
-class VoskTranscriptionConfig:
-    model_type: VoskModelType = VoskModelType.SMALL_EN_US
-    model_cache_dir: Path = DEFAULT_VOSK_CACHE_DIR
 
 
 # --- Model Cache ---
@@ -177,79 +149,6 @@ class ModelCache:
 
         gc.collect()
         log.info("Model cache cleared.")
-
-
-# --- Vosk Model Downloader ---
-def _download_and_extract_vosk_model(model_type: VoskModelType, cache_dir: Path) -> Path:
-    """Downloads and extracts a Vosk model if not already present."""
-    model_name, model_url, expected_folder = model_type.value
-    model_dir = cache_dir / expected_folder
-    zip_path = cache_dir / f"{expected_folder}.zip"
-
-    if model_dir.exists() and model_dir.is_dir():
-        log.info(f"Vosk model '{model_name}' found in cache: {model_dir}")
-        return model_dir
-
-    log.info(f"Vosk model '{model_name}' not found in cache. Attempting download...")
-    cache_dir.mkdir(parents=True, exist_ok=True)
-
-    try:
-        # Download
-        log.info(f"Downloading from {model_url} to {zip_path}...")
-        with requests.get(model_url, stream=True) as r:
-            r.raise_for_status()
-            total_size = int(r.headers.get("content-length", 0))
-            chunk_size = 8192
-            downloaded_size = 0
-            with open(zip_path, "wb") as f:
-                for chunk in r.iter_content(chunk_size=chunk_size):
-                    f.write(chunk)
-                    downloaded_size += len(chunk)
-                    # Basic progress indication
-                    progress = (downloaded_size / total_size) * 100 if total_size > 0 else 0
-                    print(
-                        f"\rDownloading... {downloaded_size / (1024 * 1024):.1f} MB / {total_size / (1024 * 1024):.1f} MB ({progress:.1f}%)",
-                        end="",
-                    )
-        print("\nDownload complete.")
-
-        # Extract
-        log.info(f"Extracting {zip_path} to {cache_dir}...")
-        with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            zip_ref.extractall(cache_dir)
-        log.info("Extraction complete.")
-
-        # Verify expected folder exists
-        if not model_dir.exists() or not model_dir.is_dir():
-            raise FileNotFoundError(
-                f"Extracted model folder '{expected_folder}' not found after download."
-            )
-
-        # Clean up zip file
-        zip_path.unlink()
-        log.info(f"Cleaned up {zip_path}.")
-
-        return model_dir
-
-    except requests.exceptions.RequestException as e:
-        log.error(f"Failed to download Vosk model: {e}")
-        if zip_path.exists():
-            zip_path.unlink(missing_ok=True)  # Cleanup partial download
-        raise
-    except (zipfile.BadZipFile, OSError) as e:
-        log.error(f"Failed to extract Vosk model: {e}")
-        if zip_path.exists():
-            zip_path.unlink(missing_ok=True)  # Cleanup zip
-        if model_dir.exists():
-            shutil.rmtree(model_dir)  # Cleanup partial extraction
-        raise
-    except Exception as e:
-        log.error(f"An unexpected error occurred during Vosk model setup: {e}")
-        if zip_path.exists():
-            zip_path.unlink(missing_ok=True)
-        if model_dir.exists():
-            shutil.rmtree(model_dir)
-        raise
 
 
 # --- Audio Recorder ---
@@ -600,77 +499,6 @@ class WhisperXTranscriber(TranscriptionService):
             return " ".join([segment["text"].strip() for segment in result["segments"]])
         except Exception as e:
             log.error(f"Error during WhisperX transcription: {e}")
-            raise
-
-
-class VoskTranscriber(TranscriptionService):
-    """Transcription using Vosk."""
-
-    def __init__(self, config: VoskTranscriptionConfig, model_cache: ModelCache):
-        super().__init__(model_cache)
-        if VoskModel is None or KaldiRecognizer is None:
-            raise ImportError("Vosk library not installed. Please install with 'pip install vosk'.")
-        self.config = config
-        self.model_path = _download_and_extract_vosk_model(
-            self.config.model_type, self.config.model_cache_dir
-        )
-        self.model_key = f"vosk_{self.config.model_type.value[0]}"  # Use model name as part of key
-
-    def _load_model(self) -> Any:
-        """Loads or retrieves the Vosk model from cache."""
-        model = self.model_cache.get(self.model_key)
-        if model:
-            log.info(f"Using cached Vosk model: {self.model_path}")
-            return model
-
-        log.info(f"Loading Vosk model from: {self.model_path}...")
-        load_start_time = time.time()
-        try:
-            model = VoskModel(str(self.model_path))  # Vosk expects string path
-            load_duration = time.time() - load_start_time
-            log.info(f"Vosk model loaded ({load_duration:.2f}s). Caching...")
-            self.model_cache.set(self.model_key, model)
-            return model
-        except Exception as load_error:
-            log.error(f"Error loading Vosk model: {load_error}")
-            raise
-
-    def transcribe(self, audio_filename: str, **kwargs) -> str:
-        model = self._load_model()
-        log.info(f"Transcribing {audio_filename} locally using Vosk...")
-        start_time = time.time()
-        try:
-            wf = wave.open(audio_filename, "rb")
-            if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE":
-                wf.close()
-                raise ValueError(
-                    "Vosk requires WAV format mono PCM audio. Please convert the audio file."
-                )
-
-            rec = KaldiRecognizer(model, wf.getframerate())
-            rec.SetWords(False)  # Set to True if word timings are needed
-
-            results = []
-            while True:
-                data = wf.readframes(4000)
-                if len(data) == 0:
-                    break
-                if rec.AcceptWaveform(data):
-                    res_json = json.loads(rec.Result())
-                    results.append(res_json.get("text", ""))
-
-            final_res_json = json.loads(rec.FinalResult())
-            results.append(final_res_json.get("text", ""))
-            wf.close()
-
-            transcribe_duration = time.time() - start_time
-            log.info(f"Vosk transcription successful ({transcribe_duration:.2f}s).")
-            return " ".join(filter(None, results)).strip()
-        except Exception as e:
-            log.error(f"Error during Vosk transcription: {e}")
-            raise
-
-
 # --- Transcription Factory ---
 class TranscriptionFactory:
     @staticmethod
@@ -687,11 +515,6 @@ class TranscriptionFactory:
                 if k.startswith("whisperx_")
             })
             return WhisperXTranscriber(config, cache)
-        elif mode == TranscriptionMode.VOSK:
-            config = VoskTranscriptionConfig(**{
-                k.replace("vosk_", ""): v for k, v in kwargs.items() if k.startswith("vosk_")
-            })
-            return VoskTranscriber(config, cache)
         else:
             raise ValueError(f"Unsupported transcription mode: {mode}")
 
@@ -790,7 +613,6 @@ if __name__ == "__main__":
     # --- Choose Transcription Mode ---
     # SELECTED_MODE = TranscriptionMode.OPENAI
     SELECTED_MODE = TranscriptionMode.WHISPERX
-    # SELECTED_MODE = TranscriptionMode.VOSK
 
     # --- Mode Specific Config ---
     transcription_kwargs = {}
@@ -805,11 +627,6 @@ if __name__ == "__main__":
         log.info(
             f"Mode: WhisperX (Model: {transcription_kwargs['whisperx_model_size'].value}, Lang: {transcription_kwargs['whisperx_language'] or 'auto'})"
         )
-    elif SELECTED_MODE == TranscriptionMode.VOSK:
-        # Model will be downloaded automatically to ~/.cache/aider_voice_utils/vosk_models if not present
-        transcription_kwargs["vosk_model_type"] = VoskModelType.SMALL_EN_US
-        # transcription_kwargs['vosk_model_cache_dir'] = Path("./my_vosk_cache") # Optional override
-        log.info(f"Mode: Vosk (Model: {transcription_kwargs['vosk_model_type'].value[0]})")
 
     # --- Recording ---
     try:
@@ -836,12 +653,8 @@ if __name__ == "__main__":
 
             except (ImportError, FileNotFoundError, ValueError) as e:
                 log.error(f"Transcription failed: {e}")
-                if SELECTED_MODE == TranscriptionMode.VOSK and isinstance(e, FileNotFoundError):
-                    log.info("Ensure the Vosk model is downloaded or the path is correct.")
-                elif SELECTED_MODE == TranscriptionMode.WHISPERX and isinstance(e, ImportError):
+                if SELECTED_MODE == TranscriptionMode.WHISPERX and isinstance(e, ImportError): # Adjusted condition
                     log.info("Install WhisperX dependencies: pip install whisperx torch")
-                elif SELECTED_MODE == TranscriptionMode.VOSK and isinstance(e, ImportError):
-                    log.info("Install Vosk dependencies: pip install vosk")
             except Exception as e:
                 log.exception(
                     f"Transcription failed with unexpected error."
